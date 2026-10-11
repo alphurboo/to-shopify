@@ -4,133 +4,117 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rockfish to Shopify 轉換工具</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --primary: #38bdf8;
-      --primary-hover: #0284c7;
-      --border: #334155;
-      --success: #10b981;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
     body {
-      background-color: var(--bg);
-      color: var(--text);
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 40px 20px;
       display: flex;
       justify-content: center;
-      padding: 40px 20px;
-      min-height: 100vh;
     }
-
     .container {
       width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 24px;
+      max-width: 800px;
     }
-
-    .header {
-      text-align: center;
-    }
-
-    .header h1 {
-      font-size: 28px;
-      font-weight: 700;
+    h1 {
+      font-size: 26px;
+      color: #38bdf8;
       margin-bottom: 8px;
-      background: linear-gradient(to right, #38bdf8, #818cf8);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
     }
-
-    .header p {
-      color: var(--text-muted);
-      font-size: 15px;
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 24px;
     }
-
     .card {
-      background-color: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
       padding: 24px;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+      box-sizing: border-box;
     }
-
     label {
       display: block;
       font-weight: 600;
       font-size: 14px;
-      margin-bottom: 8px;
-      color: var(--text);
+      margin-bottom: 10px;
     }
-
     textarea {
       width: 100%;
       height: 160px;
-      background: #0b1120;
-      border: 1px solid var(--border);
-      border-radius: 8px;
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 6px;
       padding: 12px;
-      color: var(--text);
+      color: #f8fafc;
       font-size: 14px;
-      resize: vertical;
+      box-sizing: border-box;
       outline: none;
-      transition: border-color 0.2s;
+      resize: vertical;
     }
-
     textarea:focus {
-      border-color: var(--primary);
+      border-color: #38bdf8;
     }
-
-    .actions {
+    .btn-group {
       margin-top: 16px;
       display: flex;
       gap: 12px;
-      flex-wrap: wrap;
     }
-
     button {
-      padding: 12px 24px;
+      padding: 10px 20px;
       border: none;
-      border-radius: 8px;
+      border-radius: 6px;
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s;
     }
-
-    .btn-primary {
-      background-color: var(--primary);
-      color: #0f172a;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-      background-color: var(--primary-hover);
+    .btn-run {
+      background-color: #0284c7;
       color: #ffffff;
     }
-
-    .btn-primary:disabled {
+    .btn-run:hover:not(:disabled) {
+      background-color: #0369a1;
+    }
+    .btn-run:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
-
     .btn-download {
-      background-color: var(--success);
+      background-color: #10b981;
       color: #ffffff;
       display: none;
     }
+    .btn-download:hover {
+      background-color: #059669;
+    }
+    .log-box {
+      margin-top: 20px;
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 14px;
+      min-height: 120px;
+      max-height: 240px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .log-line {
+      margin-bottom: 6px;
+      color: #94a3b8;
+    }
+    .log-ok { color: #34d399; }
+    .log-err { color: #f87171; }
+    .log-highlight { color: #38bdf8; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>🛍️ Rockfish to Shopify 轉換工具</h1>
+  <p class="subtitle">將 Rockfish 產品網址貼入下方文字框，自動抓取顏色、尺碼、相片並輸出 Shopify CSV。</p>
+
+  <div class="card">
+    <label
