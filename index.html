@@ -132,7 +132,7 @@
 
   <div class="main-wrapper">
     <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
-    <div class="header-desc">支援自動匯入商品、綁定 Variant 顏色、保留 Model 相片、預設 Draft 並精準寫入 Internal Note。</div>
+    <div class="header-desc">預設 Draft 草稿、自動勾選 Continue selling when out of stock、記錄來源 Internal Note。</div>
 
     <div class="card-box">
       <label class="field-label" for="urlInput">商品網址列表（一行一條，鞋履、手袋皆可）：</label>
@@ -581,11 +581,16 @@
           row["Variant Price"] = v ? v.price : '';
           row["Variant Requires Shipping"] = v ? 'TRUE' : '';
           row["Variant Taxable"] = v ? 'TRUE' : '';
+          
+          // 缺貨時繼續銷售 (Continue selling when out of stock)
+          row["Variant Inventory Tracker"] = v ? "shopify" : "";
+          row["Variant Inventory Policy"] = v ? "continue" : "";
+
           row["Image Src"] = img;
           row["Image Position"] = img ? (r + 1) : '';
           row["Variant Image"] = variantImg;
 
-          // 核心修正：使用 Shopify 官方標準 Metafield 欄位格式
+          // 官方標準 Metafield 格式
           row["Internal Note (product.metafields.custom.internal_note)"] = isFirstRow ? sourceNote : '';
           row["Status"] = isFirstRow ? 'draft' : '';
 
@@ -595,7 +600,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！Metafield 欄位已修正為官方標準格式，請下載 CSV。', 'ok');
+        printLog('🎉 全部處理完成！已設定缺貨繼續銷售（Continue selling），請下載 CSV。', 'ok');
         exp.style.display = 'inline-block';
       } else {
         printLog('未獲得任何資料。', 'err');
