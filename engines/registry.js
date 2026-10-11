@@ -10,30 +10,30 @@ window.ENGINE_UTILS = {
   parseColors: function(rawTitle, url) {
     var t = rawTitle.replace(/Product Name\s*:/i, '').trim();
     t = t.replace(/^\[.*?\]\s*/i, '').trim();
+
+    // 1. 先去除品牌後綴 (例如 - MARDI MERCREDI | 마르디 메크르디)
     t = t.replace(/\s*[-–|]\s*(MARDI MERCREDI|ROCKFISH|WEATHERWEAR|마르디|메크르디).*$/i, '').trim();
     t = t.replace(/\s*\|.*$/, '').trim();
 
     var color = '';
 
-    // 支援複合顏色（先匹配雙字複合色，如 SKY BLUE, LIGHT GREY, MELANGE BROWN）
-    var compoundRegex = /[\s_-]+(SKY\s+BLUE|LIGHT\s+GREY|LIGHT\s+GRAY|DARK\s+BROWN|MELANGE\s+BROWN|MELANGE\s+GREY|MELANGE\s+GRAY|BABY\s+PINK|IVORY\s+WHITE|DEEP\s+GREEN|CHARCOAL\s+GREY|CHARCOAL\s+GRAY)$/i;
-    var matchCompound = t.match(compoundRegex);
-    if (matchCompound) {
-      color = matchCompound[1].trim();
-      t = t.substring(0, matchCompound.index).trim();
+    // 2. 原版最穩定邏輯：直接以破折號切出顏色 (支援單字與多字，如 - SKY BLUE, - LIGHT GREY, - PINK)
+    var dashMatch = t.match(/\s*[-–]\s*([A-Za-z\s]+)$/);
+    if (dashMatch) {
+      color = dashMatch[1].trim();
+      t = t.substring(0, dashMatch.index).trim();
     }
 
-    // 若非複合色，匹配標準單字顏色
+    // 3. 處理底線式命名 (例如 CHECK_BLUE)
     if (!color) {
-      var singleRegex = /[\s_-]+(BLUE|PINK|MINT|BEIGE|BROWN|BLACK|WHITE|SILVER|NAVY|GRAY|GREY|RED|GREEN|IVORY|CREAM|KHAKI|CAMEL|YELLOW|PURPLE|CHARCOAL|GOLD|ORANGE|OATMEAL|MELANGE)$/i;
-      var matchSingle = t.match(singleRegex);
-      if (matchSingle) {
-        color = matchSingle[1].trim();
-        t = t.substring(0, matchSingle.index).trim();
+      var underscoreMatch = t.match(/_([A-Za-z\s]+)$/);
+      if (underscoreMatch) {
+        color = underscoreMatch[1].trim();
+        t = t.substring(0, underscoreMatch.index).trim();
       }
     }
 
-    // 若標題仍無顏色，從 URL slug 提取
+    // 4. 若標題無顏色，從 URL slug 推斷
     if (!color) {
       var lowUrl = url.toLowerCase();
       var compoundSlugs = [
@@ -72,7 +72,7 @@ window.ENGINE_UTILS = {
       color = 'Default Color';
     }
 
-    // 清理標題結尾多餘橫線與底線
+    // 清理標題結尾殘留符號
     t = t.replace(/[\s_-]+$/, '').trim();
     return { title: t, color: color };
   }
