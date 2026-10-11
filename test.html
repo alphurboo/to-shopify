@@ -41,11 +41,10 @@
     .engine-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #3b0764; color: #d8b4fe; font-size: 12px; margin-right: 6px; }
   </style>
 
-  <!-- 動態載入註冊中心與所有引擎模組 -->
+  <!-- 載入註冊表與各獨立 Engine -->
   <script src="engines/registry.js"></script>
   <script src="engines/rockfish.js"></script>
   <script src="engines/mardi.js"></script>
-  <!-- 日後有新引擎只需在上方加一行 script src="engines/xxx.js" -->
 </head>
 <body>
 
@@ -54,7 +53,7 @@
     <div class="header-title">🧪 多引擎動態對比測試工具 (Test Engine)</div>
     <div class="header-desc">
       目前已註冊引擎：<span id="engineBadges"></span><br>
-      輸入網址，系統會自動呼叫所有已註冊引擎並整合輸出為<strong>單一 CSV</strong>。
+      輸入網址，系統會自動跑遍以上所有 Engine，並整合輸出至<strong>單一 CSV</strong>。
     </div>
 
     <div class="card-box">
@@ -77,14 +76,13 @@
     var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
     var textarea = document.getElementById('urlInput');
 
-    // 渲染目前註冊的引擎 Badge
     window.addEventListener('DOMContentLoaded', function() {
       var container = document.getElementById('engineBadges');
       var engines = window.REGISTERED_ENGINES || [];
       container.innerHTML = engines.map(function(e) {
         return '<span class="engine-tag">' + e.name + ' (' + e.id + ')</span>';
       }).join(' ');
-      printLog('已成功載入 ' + engines.length + ' 個專屬解析引擎！', 'info');
+      printLog('已偵測到 ' + engines.length + ' 個獨立解析引擎！', 'info');
     });
 
     textarea.addEventListener('paste', function(e) {
@@ -168,7 +166,6 @@
       throw new Error('無法存取該頁面');
     }
 
-    // 全自動執行所有引擎
     async function runAllEnginesTest() {
       var queue = getValidUrls();
       var engines = window.REGISTERED_ENGINES || [];
@@ -177,79 +174,156 @@
         alert('請先在輸入框貼上至少一條網址！');
         return;
       }
-      if (engines.length === 0) {
-        alert('未偵測到任何註冊的 Engine！');
-        return;
-      }
 
       var btn = document.getElementById('startBtn');
       btn.disabled = true;
 
-      printLog('🧪 開始並行執行 ' + engines.length + ' 個引擎測試（共 ' + queue.length + ' 條網址）...', 'info');
+      printLog('🧪 開始執行測試，共 ' + queue.length + ' 條網址，對接 ' + engines.length + ' 個 Engine...', 'info');
 
-      var combinedRows = [];
+      // 每個 engine 建立自己嘅 group，避免互相干擾
+      var engineGroups = {};
+      engines.forEach(function(e) {
+        engineGroups[e.id] = {};
+      });
 
       for (var i = 0; i < queue.length; i++) {
         var u = queue[i];
-        printLog('讀取網頁 (' + (i + 1) + '/' + queue.length + '): ' + u);
+        printLog('讀取 (' + (i + 1) + '/' + queue.length + '): ' + u);
 
         try {
           var html = await loadHtml(u);
 
-          // 核心迴圈：自動跑遍所有 registered engines
+          // 核心：依序呼叫各個 Engine 自身的 parse function
           for (var e = 0; e < engines.length; e++) {
-            var engine = engines[e];
-            var parsed = engine.parse(html, u);
+            var eng = engines[e];
+            var parsed = eng.parse(html, u);
 
-            var taggedTitle = parsed.title + ' (' + engine.id + ')';
-            var taggedHandle = window.ENGINE_UTILS.sanitizeHandle(parsed.title) + '-' + engine.id;
+            var taggedTitle = parsed.title + ' (' + eng.id + ')';
+            var taggedHandle = parsed.handle + '-' + eng.id;
 
-            var rowCount = Math.max(parsed.sizes.length || 1, parsed.images.length || 1);
+            var grp = engineGroups[eng.id];
+            if (!grp[taggedHandle]) {
+              grp[taggedHandle] = {
+                handle: taggedHandle,
+                title: taggedTitle,
+                vendor: parsed.vendor + ' [' + eng.id + ']',
+                type: parsed.type,
+                price: parsed.price,
+                sourceUrls: [],
+                colorImages: {},
+                allImages: [],
+                variants: [],
+                sizes: parsed.sizes
+              };
+            }
 
-            for (var r = 0; r < rowCount; r++) {
-              combinedRows.push({
-                "Handle": taggedHandle,
-                "Title": (r === 0) ? taggedTitle : '',
-                "Body (HTML)": "",
-                "Vendor": (r === 0) ? (parsed.vendor + ' [Test]') : '',
-                "Type": (r === 0) ? parsed.type : '',
-                "Tags": (r === 0) ? ('Test, Engine:' + engine.id) : '',
-                "Published": "FALSE",
-                "Option1 Name": "Color",
-                "Option1 Value": parsed.color,
-                "Option2 Name": (parsed.sizes.length > 0) ? "Size" : "",
-                "Option2 Value": parsed.sizes[r] || '',
-                "Variant Price": "100.00",
-                "Variant Requires Shipping": "TRUE",
-                "Variant Taxable": "TRUE",
-                "Variant Inventory Tracker": "shopify",
-                "Variant Inventory Policy": "continue",
-                "Image Src": parsed.images[r] || '',
-                "Image Position": parsed.images[r] ? (r + 1) : '',
-                "Variant Image": (r === 0) ? parsed.keyImage : '',
-                "Internal Note (product.metafields.custom.internal_note)": (r === 0) ? ('[' + engine.id + '] ' + u) : '',
-                "Status": (r === 0) ? "draft" : ''
-              });
+            if (grp[taggedHandle].sourceUrls.indexOf(u) === -1) {
+              grp[taggedHandle].sourceUrls.push(u);
+            }
+
+            if (parsed.keyImage) {
+              grp[taggedHandle].colorImages[parsed.color] = parsed.keyImage;
+            }
+
+            for (var im = 0; im < parsed.images.length; im++) {
+              if (grp[taggedHandle].allImages.indexOf(parsed.images[im]) === -1) {
+                grp[taggedHandle].allImages.push(parsed.images[im]);
+              }
+            }
+
+            // 建立變體
+            if (parsed.sizes && parsed.sizes.length > 0) {
+              for (var s = 0; s < parsed.sizes.length; s++) {
+                var exists = false;
+                for (var vIdx = 0; vIdx < grp[taggedHandle].variants.length; vIdx++) {
+                  var ex = grp[taggedHandle].variants[vIdx];
+                  if (ex.color === parsed.color && ex.size === parsed.sizes[s]) {
+                    exists = true; break;
+                  }
+                }
+                if (!exists) {
+                  grp[taggedHandle].variants.push({ color: parsed.color, size: parsed.sizes[s], price: parsed.price });
+                }
+              }
+            } else {
+              var existsColor = false;
+              for (var cIdx = 0; cIdx < grp[taggedHandle].variants.length; cIdx++) {
+                if (grp[taggedHandle].variants[cIdx].color === parsed.color) {
+                  existsColor = true; break;
+                }
+              }
+              if (!existsColor) {
+                grp[taggedHandle].variants.push({ color: parsed.color, size: '', price: parsed.price });
+              }
             }
           }
 
-          printLog('✓ 完成該網址之全引擎測試 (' + engines.length + ' 種結果已生成)', 'ok');
+          printLog('✓ 完成網址全引擎測試: ' + u, 'ok');
         } catch (err) {
           printLog('✗ 失敗: ' + err.message, 'err');
         }
       }
 
+      // 整合輸出到同一份 CSV
+      var combinedRows = [];
+
+      engines.forEach(function(eng) {
+        var grp = engineGroups[eng.id];
+        var keys = Object.keys(grp);
+
+        for (var k = 0; k < keys.length; k++) {
+          var item = grp[keys[k]];
+          var rowCount = Math.max(item.variants.length, item.allImages.length);
+          var sourceNote = item.sourceUrls.join('\n');
+          var hasSize = item.sizes && item.sizes.length > 0;
+
+          for (var r = 0; r < rowCount; r++) {
+            var isFirstRow = (r === 0);
+            var v = item.variants[r] || null;
+            var img = item.allImages[r] || '';
+
+            var variantImg = '';
+            if (v && item.colorImages[v.color]) {
+              variantImg = item.colorImages[v.color];
+            }
+
+            combinedRows.push({
+              "Handle": item.handle,
+              "Title": isFirstRow ? item.title : '',
+              "Body (HTML)": "",
+              "Vendor": isFirstRow ? item.vendor : '',
+              "Type": isFirstRow ? item.type : '',
+              "Tags": isFirstRow ? ('Test, Engine:' + eng.id) : '',
+              "Published": "FALSE",
+              "Option1 Name": "Color",
+              "Option1 Value": v ? v.color : '',
+              "Option2 Name": hasSize ? "Size" : "",
+              "Option2 Value": (hasSize && v) ? v.size : "",
+              "Variant Price": v ? v.price : '',
+              "Variant Requires Shipping": v ? "TRUE" : "",
+              "Variant Taxable": v ? "TRUE" : "",
+              "Variant Inventory Tracker": v ? "shopify" : "",
+              "Variant Inventory Policy": v ? "continue" : "",
+              "Image Src": img,
+              "Image Position": img ? (r + 1) : '',
+              "Variant Image": variantImg,
+              "Internal Note (product.metafields.custom.internal_note)": isFirstRow ? sourceNote : '',
+              "Status": isFirstRow ? 'draft' : ''
+            });
+          }
+        }
+      });
+
       btn.disabled = false;
       if (combinedRows.length > 0) {
-        printLog('🎉 全部引擎測試完成！正在輸出單一整合 CSV...', 'ok');
-        exportCsv(combinedRows, 'multi_engine_test_' + Date.now() + '.csv');
+        printLog('🎉 全部引擎測試完成！正在輸出單一 CSV...', 'ok');
+        exportCsv(combinedRows, 'all_engines_test_' + Date.now() + '.csv');
       } else {
         printLog('未獲得任何資料。', 'err');
       }
     }
 
     function exportCsv(data, filename) {
-      if (!data || data.length === 0) return;
       var keys = Object.keys(data[0]);
       var csv = '\uFEFF' + keys.map(function(k) { return '"' + k + '"'; }).join(',') + '\n';
       for (var i = 0; i < data.length; i++) {
