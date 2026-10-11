@@ -3,98 +3,68 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>E-Commerce to Shopify 工具導航</title>
+  <title>Shopify 品牌轉換工具導航</title>
   <style>
     body {
-      background: #0f172a;
-      color: #f8fafc;
+      background: #0f172a; color: #f8fafc;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0;
-      padding: 60px 20px;
-      display: flex;
-      justify-content: center;
+      margin: 0; padding: 60px 20px; display: flex; justify-content: center;
     }
-    .container {
-      width: 100%;
-      max-width: 640px;
-      text-align: center;
-    }
-    h1 {
-      color: #38bdf8;
-      font-size: 28px;
-      margin-bottom: 10px;
-    }
-    p {
-      color: #94a3b8;
-      font-size: 14px;
-      margin-bottom: 36px;
-    }
-    .grid {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
+    .container { width: 100%; max-width: 680px; text-align: center; }
+    h1 { color: #38bdf8; font-size: 28px; margin-bottom: 8px; }
+    p { color: #94a3b8; font-size: 14px; margin-bottom: 32px; }
+    .grid { display: flex; flex-direction: column; gap: 14px; }
     .card-btn {
-      display: block;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 10px;
-      padding: 20px;
-      text-decoration: none;
-      color: #ffffff;
-      text-align: left;
+      display: block; background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      padding: 18px 22px; text-decoration: none; color: #ffffff; text-align: left;
       transition: all 0.2s ease;
     }
-    .card-btn:hover {
-      border-color: #38bdf8;
-      transform: translateY(-2px);
-      background: #243248;
-    }
-    .card-btn h3 {
-      margin: 0 0 6px 0;
-      font-size: 18px;
-      color: #38bdf8;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .card-btn p {
-      margin: 0;
-      color: #94a3b8;
-      font-size: 13px;
-    }
-    .badge {
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: #0369a1;
-      color: #ffffff;
-    }
+    .card-btn:hover { border-color: #38bdf8; transform: translateY(-2px); background: #243248; }
+    .card-btn h3 { margin: 0 0 6px 0; font-size: 17px; color: #38bdf8; display: flex; justify-content: space-between; }
+    .card-btn p { margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.4; }
+    .badge { font-size: 12px; padding: 2px 8px; border-radius: 4px; background: #0284c7; color: #ffffff; }
+    .test-card { border-color: #7c3aed; }
+    .test-card h3 { color: #c084fc; }
+    .test-badge { background: #9333ea; }
   </style>
+
+  <!-- 載入註冊中心與所有引擎 -->
+  <script src="engines/registry.js"></script>
+  <script src="engines/rockfish.js"></script>
+  <script src="engines/mardi.js"></script>
 </head>
 <body>
 
 <div class="container">
   <h1>🛍️ Shopify 轉換工具中心</h1>
-  <p>請選擇你今日需要搬運的品牌站點，或使用測試工具進行對比：</p>
+  <p id="subTitle">載入中...</p>
 
-  <div class="grid">
-    <a href="rockfish.html" class="card-btn">
-      <h3>👢 Rockfish Weatherwear <span class="badge">專屬</span></h3>
-      <p>專門支援鞋碼自動匹配（230-255）、手袋免碼、extra/big 高清模特相與顏色合併。</p>
-    </a>
+  <div class="grid" id="engineList">
+    <!-- 卡片將由 JS 自動生成 -->
+  </div>
 
-    <a href="mardi.html" class="card-btn">
-      <h3>🌸 Mardi Mercredi <span class="badge">專屬</span></h3>
-      <p>專門修正長條圖壓縮問題、優先抓取正方形平鋪主圖、精準切除韓文字綴。</p>
-    </a>
-
-    <a href="test.html" class="card-btn">
-      <h3>🧪 多引擎測試工具 (Test Engine) <span class="badge" style="background:#7c3aed;">對比測試</span></h3>
-      <p>貼入未知新品牌，同時以 Rockfish 與 Mardi 引擎解析並分別匯出 CSV 對比效果。</p>
+  <div style="margin-top: 18px;">
+    <a href="test.html" class="card-btn test-card">
+      <h3>🧪 多引擎對比測試工具 (Test Engine) <span class="badge test-badge">全引擎自動跑</span></h3>
+      <p>貼入未知新品牌，全自動呼叫上方所有引擎解析，並輸出單一 CSV 檔（標註 engine id）供對比。</p>
     </a>
   </div>
 </div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', function() {
+    var engines = window.REGISTERED_ENGINES || [];
+    document.getElementById('subTitle').innerText = '目前已啟用 ' + engines.length + ' 個專屬品牌解析引擎：';
+
+    var container = document.getElementById('engineList');
+    container.innerHTML = engines.map(function(e) {
+      return '<a href="' + e.pageUrl + '" class="card-btn">' +
+               '<h3>' + e.name + ' <span class="badge">專屬</span></h3>' +
+               '<p>' + e.description + '</p>' +
+             '</a>';
+    }).join('');
+  });
+</script>
 
 </body>
 </html>
