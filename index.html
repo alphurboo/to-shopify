@@ -132,7 +132,7 @@
 
   <div class="main-wrapper">
     <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
-    <div class="header-desc">自動抓取高清商品圖與 Model 相片，鞋款智慧配對 230-255 尺碼（手袋不加 Size）。</div>
+    <div class="header-desc">匯入後自動設為 Draft（草稿未發佈狀態），並在內部專屬 Note 記錄來源商品網址。</div>
 
     <div class="card-box">
       <label class="field-label" for="urlInput">商品網址列表（一行一條，鞋履、手袋皆可）：</label>
@@ -241,7 +241,6 @@
       return { cleanTitle: t, color: color };
     }
 
-    // 爬取 DESCRIPTION：爬到就用，爬唔到直接回傳空字串，絕不產生廢話
     function parseCleanDescription(doc) {
       var rawText = '';
       var candidates = [
@@ -316,7 +315,6 @@
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, 'text/html');
 
-      // 1. 標題與顏色
       var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name');
       var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
       if (!rawTitle && doc.title) rawTitle = doc.title.split(/[-–|]/)[0].trim();
@@ -325,10 +323,8 @@
       var title = info.cleanTitle;
       var currentColor = info.color;
 
-      // 2. 描述（爬唔到就空）
       var cleanDesc = parseCleanDescription(doc);
 
-      // 3. 價格
       var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
       var price = '0.00';
       if (priceTag) {
@@ -337,13 +333,11 @@
         if (match) price = match[0].replace(/,/g, '');
       }
 
-      // 4. 高清圖片與 Model 相提取
       var uri = new URL(productUrl);
       var root = uri.origin;
       var keyProductImg = '';
       var cleanModelImgs = [];
 
-      // 主商品圖
       var mainImgEl = doc.querySelector('meta[property="og:image"], .keyImg img, .thumbnail img');
       if (mainImgEl) {
         var mSrc = mainImgEl.getAttribute('content') || mainImgEl.getAttribute('src') || mainImgEl.getAttribute('ec-data-src') || '';
@@ -352,7 +346,6 @@
         keyProductImg = mSrc;
       }
 
-      // 掃描頁面所有圖片節點（包括附加相片區 .xans-product-additional 與 內文大圖）
       var allImgNodes = doc.querySelectorAll('img');
       for (var i = 0; i < allImgNodes.length; i++) {
         var node = allImgNodes[i];
@@ -361,7 +354,6 @@
                   node.getAttribute('data-src') || 
                   node.getAttribute('src') || '';
 
-        // 如果包含小縮圖路徑，自動替換為 big 高清大圖
         if (src.indexOf('/small/') !== -1) {
           src = src.replace('/small/', '/big/');
         }
@@ -372,7 +364,6 @@
 
           var low = src.toLowerCase();
 
-          // 嚴格剔除所有垃圾圖片
           var isJunk = low.indexOf('naver') !== -1 ||
                        low.indexOf('pay') !== -1 ||
                        low.indexOf('/small/') !== -1 ||
@@ -386,7 +377,6 @@
                        low.indexOf('.gif') !== -1;
 
           if (!isJunk) {
-            // 只要是 big 大圖、extra/big 或細節大圖，就是 Model / 商品高清圖
             if (low.indexOf('/big/') !== -1 || low.indexOf('rockfish.cafe24.com') !== -1) {
               if (!keyProductImg) keyProductImg = src;
               if (cleanModelImgs.indexOf(src) === -1 && src !== keyProductImg) {
@@ -397,11 +387,9 @@
         }
       }
 
-      // 5. 智慧尺碼判斷
       var sizes = [];
       var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(title) || /category\/230|shoes/i.test(productUrl);
 
-      // 從內嵌資料中解析
       var sizeMatch = html.match(/"option_value":\s*"(\d{3})"/g);
       if (sizeMatch) {
         for (var sm = 0; sm < sizeMatch.length; sm++) {
@@ -412,7 +400,6 @@
         }
       }
 
-      // 鞋款標準尺碼（手袋不加）
       if (isShoe && sizes.length === 0) {
         sizes = ['230', '235', '240', '245', '250', '255'];
       }
@@ -425,7 +412,8 @@
         modelImages: cleanModelImgs,
         color: currentColor,
         sizes: sizes,
-        description: cleanDesc
+        description: cleanDesc,
+        sourceUrl: productUrl // 記錄原始官網網址
       };
     }
 
@@ -463,6 +451,7 @@
                 title: item.title,
                 price: item.price,
                 description: item.description,
+                sourceUrls: [],
                 colorImages: {},
                 productImages: [],
                 modelImages: [],
@@ -471,11 +460,14 @@
               };
             }
 
+            if (productGroups[item.handle].sourceUrls.indexOf(item.sourceUrl) === -1) {
+              productGroups[item.handle].sourceUrls.push(item.sourceUrl);
+            }
+
             if (item.description && item.description.length > productGroups[item.handle].description.length) {
               productGroups[item.handle].description = item.description;
             }
 
-            // 該顏色商品圖
             if (item.keyImage) {
               productGroups[item.handle].colorImages[item.color] = item.keyImage;
               if (productGroups[item.handle].productImages.indexOf(item.keyImage) === -1) {
@@ -483,7 +475,6 @@
               }
             }
 
-            // Model 相與細節大圖（最多收錄 12 張高清大圖，全數保留模特兒著用相）
             for (var m = 0; m < item.modelImages.length; m++) {
               var mPic = item.modelImages[m];
               if (productGroups[item.handle].modelImages.length < 12) {
@@ -493,7 +484,6 @@
               }
             }
 
-            // 變體配對
             if (item.sizes.length > 0) {
               productGroups[item.handle].hasSize = true;
               for (var s = 0; s < item.sizes.length; s++) {
@@ -544,16 +534,17 @@
       for (var g = 0; g < groupKeys.length; g++) {
         var grp = productGroups[groupKeys[g]];
 
-        // 完整相片列表：所有顏色商品圖 + Model相
         var finalGallery = grp.productImages.concat(grp.modelImages);
         var rowCount = Math.max(grp.variants.length, finalGallery.length);
+
+        // 內部來源網址 Note（僅自己可見）
+        var sourceNote = grp.sourceUrls.join('\n');
 
         for (var r = 0; r < rowCount; r++) {
           var isFirstRow = (r === 0);
           var v = grp.variants[r] || null;
           var img = finalGallery[r] || '';
 
-          // 綁定 Variant Image
           var variantImg = '';
           if (v && grp.colorImages[v.color]) {
             variantImg = grp.colorImages[v.color];
@@ -576,7 +567,7 @@
             "Vendor": isFirstRow ? 'Rockfish Weatherwear' : '',
             "Type": isFirstRow ? (grp.hasSize ? 'Shoes' : 'Bags & Accessories') : '',
             "Tags": isFirstRow ? 'Korea, Fashion, 代購' : '',
-            "Published": isFirstRow ? 'TRUE' : '',
+            "Published": "FALSE", // 設為不公開
             "Option1 Name": "Color",
             "Option1 Value": v ? v.color : ''
           };
@@ -595,8 +586,12 @@
           row["Image Src"] = img;
           row["Image Position"] = img ? (r + 1) : '';
           row["Variant Image"] = variantImg;
-          row["Product Details [custom.product_details]"] = isFirstRow ? grp.description : '';
-          row["Status"] = isFirstRow ? 'active' : '';
+          
+          // 內部 Note 欄位：顧客無法在前台看到，方便自己後台回溯原網址
+          row["Internal Note [custom.internal_note]"] = isFirstRow ? sourceNote : '';
+          
+          // 預設為 draft 草稿狀態（未上架），等待自己手動 active
+          row["Status"] = isFirstRow ? 'draft' : '';
 
           finalData.push(row);
         }
@@ -604,7 +599,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！Model 相已全數入庫，請下載 CSV。', 'ok');
+        printLog('🎉 全部處理完成！商品預設為 Draft，來源網址已加入內部 Note。', 'ok');
         exp.style.display = 'inline-block';
       } else {
         printLog('未獲得任何資料。', 'err');
