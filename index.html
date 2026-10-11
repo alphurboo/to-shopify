@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Rockfish to Shopify 轉換工具</title>
+  <title>to-Shopify</title>
   <style>
     html, body {
       background: #0f172a !important;
@@ -64,6 +64,7 @@
       box-sizing: border-box;
       outline: none;
       resize: vertical;
+      line-height: 1.5;
     }
 
     #urlInput:focus {
@@ -72,40 +73,34 @@
 
     .btn-bar {
       margin-top: 16px;
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     button {
-      padding: 10px 18px;
+      padding: 11px 22px;
       font-size: 14px;
       font-weight: 600;
       border-radius: 6px;
       border: none;
       cursor: pointer;
-      margin-right: 8px;
-      margin-bottom: 8px;
+      transition: background-color 0.2s, opacity 0.2s;
     }
-
-    .btn-gray { background: #475569; color: #ffffff; }
-    .btn-gray:hover { background: #64748b; }
 
     .btn-blue { background: #0284c7; color: #ffffff; }
     .btn-blue:hover { background: #0369a1; }
     .btn-blue:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .btn-green { background: #10b981; color: #ffffff; display: none; }
-    .btn-green:hover { background: #059669; }
-
     .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #475569; }
     .btn-outline:hover { background: #334155; color: #ffffff; }
 
     .counter-text {
-      display: inline-block;
       color: #38bdf8;
       font-size: 13px;
       font-weight: 600;
-      margin-left: 10px;
-      vertical-align: middle;
+      margin-left: auto;
     }
 
     #consoleBox {
@@ -131,32 +126,81 @@
 <body>
 
   <div class="main-wrapper">
-    <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
-    <div class="header-desc">預設 Draft 草稿、自動勾選 Continue selling when out of stock、記錄來源 Internal Note。</div>
+    <div class="header-title">🛍️ to-Shopify</div>
+    <div class="header-desc"></div>
 
     <div class="card-box">
-      <label class="field-label" for="urlInput">商品網址列表（一行一條，鞋履、手袋皆可）：</label>
-      <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-beige/4282/category/230/display/1/"></textarea>
+      <label class="field-label" for="urlInput">商品網址列表：</label>
+      <textarea id="urlInput" placeholder="請在此貼上連結"></textarea>
 
       <div class="btn-bar">
-        <button type="button" class="btn-gray" onclick="confirmLinks()">✅ 確認加入清單</button>
-        <button type="button" id="startBtn" class="btn-blue" onclick="processAllParallel()">🚀 開始高速抓取</button>
-        <button type="button" id="exportBtn" class="btn-green" onclick="exportShopifyCSV()">📥 下載 Shopify CSV</button>
+        <button type="button" id="startBtn" class="btn-blue" onclick="processAllParallel()">抓取</button>
         <button type="button" class="btn-outline" onclick="resetForm()">清空</button>
-        <span id="urlCount" class="counter-text">待處理：0 個商品</span>
+        <span id="urlCount" class="counter-text">已輸入：0 個商品</span>
       </div>
 
       <div id="consoleBox">
-        <div class="log-row">系統初始化完畢，請貼上網址後點擊「確認加入清單」。</div>
+        <div class="log-row">系統就緒，貼上網址後直接點擊「一鍵抓取並自動下載 CSV」。</div>
       </div>
     </div>
   </div>
 
   <script>
     var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
-
-    var queue = [];
     var finalData = [];
+
+    var textarea = document.getElementById('urlInput');
+
+    // 貼上時自動跳下一行，並即時更新商品計數
+    textarea.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      if (!pastedText) return;
+
+      var current = this.value;
+      var start = this.selectionStart;
+      var end = this.selectionEnd;
+
+      // 確保貼上的文字以換行結尾
+      var toInsert = pastedText.trim();
+      if (!toInsert.endsWith('\n')) {
+        toInsert += '\n';
+      }
+
+      var before = current.substring(0, start);
+      var after = current.substring(end);
+
+      // 如果當前行前面有內容且不是剛好在換行後，先補一個換行
+      if (before.length > 0 && !before.endsWith('\n')) {
+        toInsert = '\n' + toInsert;
+      }
+
+      this.value = before + toInsert + after;
+      var newPos = (before + toInsert).length;
+      this.selectionStart = newPos;
+      this.selectionEnd = newPos;
+
+      updateCount();
+    });
+
+    textarea.addEventListener('input', updateCount);
+
+    function getValidUrls() {
+      var lines = textarea.value.split('\n');
+      var clean = [];
+      for (var i = 0; i < lines.length; i++) {
+        var str = lines[i].trim();
+        if (str.indexOf('http://') === 0 || str.indexOf('https://') === 0) {
+          if (clean.indexOf(str) === -1) clean.push(str);
+        }
+      }
+      return clean;
+    }
+
+    function updateCount() {
+      var urls = getValidUrls();
+      document.getElementById('urlCount').innerText = '已輸入：' + urls.length + ' 個商品';
+    }
 
     function printLog(text, type) {
       var box = document.getElementById('consoleBox');
@@ -173,34 +217,10 @@
       box.scrollTop = box.scrollHeight;
     }
 
-    function confirmLinks() {
-      var val = document.getElementById('urlInput').value;
-      var rawLines = val.split('\n');
-      var clean = [];
-
-      for (var i = 0; i < rawLines.length; i++) {
-        var str = rawLines[i].trim();
-        if (str.indexOf('http://') === 0 || str.indexOf('https://') === 0) {
-          if (clean.indexOf(str) === -1) clean.push(str);
-        }
-      }
-
-      queue = clean;
-      document.getElementById('urlCount').innerText = '待處理：' + queue.length + ' 個商品';
-
-      if (queue.length > 0) {
-        printLog('已鎖定 ' + queue.length + ' 個有效連結！可以點擊「開始高速抓取」。', 'ok');
-      } else {
-        alert('請先輸入至少一條以 http:// 或 https:// 開頭的網址！');
-      }
-    }
-
     function resetForm() {
-      document.getElementById('urlInput').value = '';
-      queue = [];
+      textarea.value = '';
       finalData = [];
-      document.getElementById('urlCount').innerText = '待處理：0 個商品';
-      document.getElementById('exportBtn').style.display = 'none';
+      updateCount();
       printLog('已清空所有內容。', 'info');
     }
 
@@ -418,16 +438,17 @@
     }
 
     async function processAllParallel() {
-      if (queue.length === 0) confirmLinks();
-      if (queue.length === 0) return;
+      var queue = getValidUrls();
+      if (queue.length === 0) {
+        alert('請先在輸入框貼上至少一條以 http:// 或 https:// 開頭的網址！');
+        return;
+      }
 
       var btn = document.getElementById('startBtn');
-      var exp = document.getElementById('exportBtn');
       btn.disabled = true;
-      exp.style.display = 'none';
       finalData = [];
 
-      printLog('🚀 啟動極速引擎，並行抓取 ' + queue.length + ' 個商品中...', 'info');
+      printLog('🚀 啟動極速引擎，正在抓取 ' + queue.length + ' 個商品...', 'info');
 
       var productGroups = {};
       var concurrency = 5;
@@ -581,16 +602,11 @@
           row["Variant Price"] = v ? v.price : '';
           row["Variant Requires Shipping"] = v ? 'TRUE' : '';
           row["Variant Taxable"] = v ? 'TRUE' : '';
-          
-          // 缺貨時繼續銷售 (Continue selling when out of stock)
           row["Variant Inventory Tracker"] = v ? "shopify" : "";
           row["Variant Inventory Policy"] = v ? "continue" : "";
-
           row["Image Src"] = img;
           row["Image Position"] = img ? (r + 1) : '';
           row["Variant Image"] = variantImg;
-
-          // 官方標準 Metafield 格式
           row["Internal Note (product.metafields.custom.internal_note)"] = isFirstRow ? sourceNote : '';
           row["Status"] = isFirstRow ? 'draft' : '';
 
@@ -600,14 +616,15 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！已設定缺貨繼續銷售（Continue selling），請下載 CSV。', 'ok');
-        exp.style.display = 'inline-block';
+        printLog('🎉 全部處理完成！正在為你自動下載 Shopify CSV...', 'ok');
+        // 自動觸發下載 CSV
+        downloadCsvFile();
       } else {
         printLog('未獲得任何資料。', 'err');
       }
     }
 
-    function exportShopifyCSV() {
+    function downloadCsvFile() {
       if (finalData.length === 0) return;
 
       var keys = Object.keys(finalData[0]);
