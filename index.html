@@ -51,6 +51,21 @@
       margin-bottom: 8px;
     }
 
+    .worker-input {
+      display: block;
+      width: 100%;
+      height: 38px;
+      background: #020617;
+      color: #38bdf8;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 0 12px;
+      font-size: 13px;
+      box-sizing: border-box;
+      outline: none;
+      margin-bottom: 16px;
+    }
+
     #urlInput {
       display: block;
       width: 100%;
@@ -66,7 +81,7 @@
       resize: vertical;
     }
 
-    #urlInput:focus {
+    #urlInput:focus, .worker-input:focus {
       border-color: #38bdf8;
     }
 
@@ -86,34 +101,18 @@
       margin-bottom: 8px;
     }
 
-    .btn-gray {
-      background: #475569;
-      color: #ffffff;
-    }
+    .btn-gray { background: #475569; color: #ffffff; }
     .btn-gray:hover { background: #64748b; }
 
-    .btn-blue {
-      background: #0284c7;
-      color: #ffffff;
-    }
+    .btn-blue { background: #0284c7; color: #ffffff; }
     .btn-blue:hover { background: #0369a1; }
+    .btn-blue:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .btn-green {
-      background: #10b981;
-      color: #ffffff;
-      display: none;
-    }
+    .btn-green { background: #10b981; color: #ffffff; display: none; }
     .btn-green:hover { background: #059669; }
 
-    .btn-outline {
-      background: transparent;
-      color: #94a3b8;
-      border: 1px solid #475569;
-    }
-    .btn-outline:hover {
-      background: #334155;
-      color: #ffffff;
-    }
+    .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #475569; }
+    .btn-outline:hover { background: #334155; color: #ffffff; }
 
     .counter-text {
       display: inline-block;
@@ -138,10 +137,7 @@
       box-sizing: border-box;
     }
 
-    .log-row {
-      color: #94a3b8;
-      word-break: break-all;
-    }
+    .log-row { color: #94a3b8; word-break: break-all; }
     .log-success { color: #34d399; }
     .log-error { color: #f87171; }
     .log-accent { color: #38bdf8; }
@@ -151,15 +147,18 @@
 
   <div class="main-wrapper">
     <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
-    <div class="header-desc">支援將同款不同色連結自動 Combine 成同一個 Shopify 產品（包含所有顏色、尺碼與圖片）。</div>
+    <div class="header-desc">採用多線程並行高速抓取，自動 Combine 同款不同色為同一產品並輸出 Shopify CSV。</div>
 
     <div class="card-box">
-      <label class="field-label" for="urlInput">商品網址列表（一行一條，同款不同色直接貼埋一齊）：</label>
-      <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-beige/4282/category/230/display/1/&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-brown/4283/category/230/display/1/"></textarea>
+      <label class="field-label" for="workerUrl">專屬 Cloudflare Worker Proxy 網址（可選，極速專用）：</label>
+      <input type="text" id="workerUrl" class="worker-input" placeholder="例如：https://my-proxy.xxxx.workers.dev（留空則自動使用免費公共線路）">
+
+      <label class="field-label" for="urlInput">商品網址列表（一行一條，支援 30+ 條）：</label>
+      <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-beige/4282/category/230/display/1/"></textarea>
 
       <div class="btn-bar">
         <button type="button" class="btn-gray" onclick="confirmLinks()">✅ 確認加入清單</button>
-        <button type="button" id="startBtn" class="btn-blue" onclick="processAll()">🚀 開始抓取商品</button>
+        <button type="button" id="startBtn" class="btn-blue" onclick="processAllParallel()">🚀 開始高速抓取</button>
         <button type="button" id="exportBtn" class="btn-green" onclick="exportShopifyCSV()">📥 下載 Shopify CSV</button>
         <button type="button" class="btn-outline" onclick="resetForm()">清空</button>
         <span id="urlCount" class="counter-text">待處理：0 個商品</span>
@@ -208,7 +207,7 @@
       document.getElementById('urlCount').innerText = '待處理：' + queue.length + ' 個商品';
 
       if (queue.length > 0) {
-        printLog('已鎖定 ' + queue.length + ' 個有效連結！可以點擊「開始抓取商品」。', 'ok');
+        printLog('已鎖定 ' + queue.length + ' 個有效連結！可以點擊「開始高速抓取」。', 'ok');
       } else {
         alert('請先輸入至少一條以 http:// 或 https:// 開頭的網址！');
       }
@@ -257,18 +256,21 @@
         color = 'Default Color';
       }
 
-      return {
-        cleanTitle: t,
-        color: color
-      };
+      return { cleanTitle: t, color: color };
     }
 
     async function loadHtml(url) {
-      var proxyList = [
-        'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
-        'https://corsproxy.io/?' + encodeURIComponent(url),
-        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
-      ];
+      var customWorker = document.getElementById('workerUrl').value.trim();
+      var proxyList = [];
+
+      if (customWorker) {
+        var cleanWorker = customWorker.replace(/\/+$/, '');
+        proxyList.push(cleanWorker + '/?url=' + encodeURIComponent(url));
+      }
+
+      proxyList.push('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url));
+      proxyList.push('https://corsproxy.io/?' + encodeURIComponent(url));
+      proxyList.push('https://api.allorigins.win/raw?url=' + encodeURIComponent(url));
 
       for (var p = 0; p < proxyList.length; p++) {
         try {
@@ -289,13 +291,8 @@
       var doc = parser.parseFromString(html, 'text/html');
 
       var titleTag = doc.querySelector('.headingArea h2, .name, font.ec-product-name, meta[property="og:title"]');
-      var rawTitle = '';
-      if (titleTag) {
-        rawTitle = titleTag.getAttribute('content') || titleTag.innerText || '';
-      }
-      if (!rawTitle && doc.title) {
-        rawTitle = doc.title.split('-')[0].trim();
-      }
+      var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
+      if (!rawTitle && doc.title) rawTitle = doc.title.split('-')[0].trim();
 
       var info = parseTitleAndColor(rawTitle, productUrl);
       var title = info.cleanTitle;
@@ -322,9 +319,7 @@
 
           var low = src.toLowerCase();
           if (low.indexOf('icon') === -1 && low.indexOf('btn') === -1 && low.indexOf('blank') === -1 && low.indexOf('common') === -1) {
-            if (images.indexOf(src) === -1) {
-              images.push(src);
-            }
+            if (images.indexOf(src) === -1) images.push(src);
           }
         }
       }
@@ -338,9 +333,7 @@
           var sizeMatches = text.match(/\b(22[0-9]|23[0-9]|24[0-9]|25[0-9]|26[0-9]|27[0-9]|XS|S|M|L|XL|FREE)\b/g);
           if (sizeMatches) {
             for (var sm = 0; sm < sizeMatches.length; sm++) {
-              if (sizes.indexOf(sizeMatches[sm]) === -1) {
-                sizes.push(sizeMatches[sm]);
-              }
+              if (sizes.indexOf(sizeMatches[sm]) === -1) sizes.push(sizeMatches[sm]);
             }
           }
         }
@@ -349,8 +342,7 @@
       if (sizes.length === 0) {
         var selects = doc.querySelectorAll('select[id*="product_option_id"], select.ProductOption0');
         for (var s = 0; s < selects.length; s++) {
-          var sel = selects[s];
-          var optElems = sel.querySelectorAll('option');
+          var optElems = selects[s].querySelectorAll('option');
           for (var o = 0; o < optElems.length; o++) {
             var t = optElems[o].innerText.trim();
             if (t && t.indexOf('*') !== 0 && t.toLowerCase().indexOf('choose') === -1 && t.toLowerCase().indexOf('선택') === -1) {
@@ -361,9 +353,7 @@
         }
       }
 
-      if (sizes.length === 0) {
-        sizes = ['230', '235', '240', '245', '250', '255'];
-      }
+      if (sizes.length === 0) sizes = ['230', '235', '240', '245', '250', '255'];
 
       return {
         title: title,
@@ -375,10 +365,9 @@
       };
     }
 
-    async function processAll() {
-      if (queue.length === 0) {
-        confirmLinks();
-      }
+    // 核心並行抓取引擎（最多 5 條同時發出請求）
+    async function processAllParallel() {
+      if (queue.length === 0) confirmLinks();
       if (queue.length === 0) return;
 
       var btn = document.getElementById('startBtn');
@@ -387,63 +376,69 @@
       exp.style.display = 'none';
       finalData = [];
 
-      printLog('開始批次抓取 ' + queue.length + ' 個商品...', 'info');
+      printLog('🚀 啟動並行引擎，正在同時處理 ' + queue.length + ' 個商品...', 'info');
 
-      // 建立產品群組字典（用 handle 做 key，自動 Combine 同款商品）
       var productGroups = {};
+      var concurrency = 5; // 同時抓 5 條
+      var currentIndex = 0;
 
-      for (var i = 0; i < queue.length; i++) {
-        var u = queue[i];
-        printLog('(' + (i + 1) + '/' + queue.length + ') 抓取中: ' + u);
+      async function worker() {
+        while (currentIndex < queue.length) {
+          var idx = currentIndex++;
+          var u = queue[idx];
+          printLog('正在連線 (' + (idx + 1) + '/' + queue.length + '): ' + u);
 
-        try {
-          var raw = await loadHtml(u);
-          var item = extractProduct(raw, u);
+          try {
+            var raw = await loadHtml(u);
+            var item = extractProduct(raw, u);
+            printLog('✓ 完成 (' + (idx + 1) + '): ' + item.title + ' [' + item.color + ']', 'ok');
 
-          printLog('✓ 成功: ' + item.title + ' [' + item.color + '] (' + item.sizes.join('/') + ')', 'ok');
-
-          if (!productGroups[item.handle]) {
-            productGroups[item.handle] = {
-              handle: item.handle,
-              title: item.title,
-              price: item.price,
-              images: [],
-              variants: []
-            };
-          }
-
-          // 合併相片（避免重覆）
-          for (var imgIdx = 0; imgIdx < item.images.length; imgIdx++) {
-            if (productGroups[item.handle].images.indexOf(item.images[imgIdx]) === -1) {
-              productGroups[item.handle].images.push(item.images[imgIdx]);
+            if (!productGroups[item.handle]) {
+              productGroups[item.handle] = {
+                handle: item.handle,
+                title: item.title,
+                price: item.price,
+                images: [],
+                variants: []
+              };
             }
-          }
 
-          // 合併該顏色的所有尺碼變體
-          for (var s = 0; s < item.sizes.length; s++) {
-            var exists = false;
-            for (var vIdx = 0; vIdx < productGroups[item.handle].variants.length; vIdx++) {
-              var ex = productGroups[item.handle].variants[vIdx];
-              if (ex.color === item.color && ex.size === item.sizes[s]) {
-                exists = true;
-                break;
+            for (var imgIdx = 0; imgIdx < item.images.length; imgIdx++) {
+              if (productGroups[item.handle].images.indexOf(item.images[imgIdx]) === -1) {
+                productGroups[item.handle].images.push(item.images[imgIdx]);
               }
             }
-            if (!exists) {
-              productGroups[item.handle].variants.push({
-                color: item.color,
-                size: item.sizes[s],
-                price: item.price
-              });
-            }
-          }
 
-        } catch (err) {
-          printLog('✗ 失敗: ' + err.message, 'err');
+            for (var s = 0; s < item.sizes.length; s++) {
+              var exists = false;
+              for (var vIdx = 0; vIdx < productGroups[item.handle].variants.length; vIdx++) {
+                var ex = productGroups[item.handle].variants[vIdx];
+                if (ex.color === item.color && ex.size === item.sizes[s]) {
+                  exists = true;
+                  break;
+                }
+              }
+              if (!exists) {
+                productGroups[item.handle].variants.push({
+                  color: item.color,
+                  size: item.sizes[s],
+                  price: item.price
+                });
+              }
+            }
+          } catch (err) {
+            printLog('✗ 失敗 (' + (idx + 1) + '): ' + err.message, 'err');
+          }
         }
       }
 
-      // 將 Group 好的商品轉成標準 Shopify CSV 格式
+      var pool = [];
+      for (var i = 0; i < Math.min(concurrency, queue.length); i++) {
+        pool.push(worker());
+      }
+      await Promise.all(pool);
+
+      // 排版 Shopify CSV
       var groupKeys = Object.keys(productGroups);
       for (var g = 0; g < groupKeys.length; g++) {
         var grp = productGroups[groupKeys[g]];
@@ -478,7 +473,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完畢！已成功自動 Combine 同款顏色。請點擊綠色按鈕下載 CSV。', 'ok');
+        printLog('🎉 全部處理完成！請點擊綠色「下載 Shopify CSV」。', 'ok');
         exp.style.display = 'inline-block';
       } else {
         printLog('未獲得任何資料。', 'err');
