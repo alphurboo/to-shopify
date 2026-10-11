@@ -5,18 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Rockfish to Shopify 轉換工具</title>
   <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
     body {
       background-color: #0b0f19;
       color: #e2e8f0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0;
       padding: 40px 20px;
       display: flex;
       justify-content: center;
     }
     .container {
       width: 100%;
-      max-width: 800px;
+      max-width: 840px;
     }
     h1 {
       font-size: 26px;
@@ -31,44 +35,61 @@
     .card {
       background-color: #1e293b;
       border: 1px solid #334155;
-      border-radius: 10px;
+      border-radius: 12px;
       padding: 24px;
-      box-sizing: border-box;
     }
     label {
       display: block;
       font-weight: 600;
       font-size: 14px;
       margin-bottom: 10px;
+      color: #f1f5f9;
     }
     textarea {
       width: 100%;
-      height: 160px;
+      height: 180px;
       background-color: #0f172a;
-      border: 1px solid #475569;
-      border-radius: 6px;
-      padding: 12px;
-      color: #f8fafc;
+      border: 1.5px solid #475569;
+      border-radius: 8px;
+      padding: 14px;
+      color: #ffffff;
       font-size: 14px;
-      box-sizing: border-box;
+      line-height: 1.5;
       outline: none;
       resize: vertical;
+      cursor: text;
+      user-select: text;
+      -webkit-user-select: text;
     }
     textarea:focus {
       border-color: #38bdf8;
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
     }
     .btn-group {
       margin-top: 16px;
       display: flex;
       gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
     }
     button {
-      padding: 10px 20px;
+      padding: 11px 20px;
       border: none;
-      border-radius: 6px;
+      border-radius: 7px;
       font-weight: 600;
       font-size: 14px;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.2s, background-color 0.2s;
+    }
+    .btn-confirm {
+      background-color: #475569;
+      color: #ffffff;
+    }
+    .btn-confirm:hover {
+      background-color: #64748b;
     }
     .btn-run {
       background-color: #0284c7;
@@ -78,7 +99,7 @@
       background-color: #0369a1;
     }
     .btn-run:disabled {
-      opacity: 0.5;
+      opacity: 0.45;
       cursor: not-allowed;
     }
     .btn-download {
@@ -89,32 +110,34 @@
     .btn-download:hover {
       background-color: #059669;
     }
+    .btn-clear {
+      background-color: transparent;
+      color: #94a3b8;
+      border: 1px solid #475569;
+    }
+    .btn-clear:hover {
+      background-color: #334155;
+      color: #f1f5f9;
+    }
+    .items-count-badge {
+      font-size: 13px;
+      color: #38bdf8;
+      font-weight: 600;
+      margin-left: auto;
+    }
     .log-box {
-      margin-top: 20px;
+      margin-top: 22px;
       background-color: #0f172a;
       border: 1px solid #334155;
-      border-radius: 6px;
-      padding: 14px;
-      min-height: 120px;
-      max-height: 240px;
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 140px;
+      max-height: 280px;
       overflow-y: auto;
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 13px;
     }
     .log-line {
       margin-bottom: 6px;
       color: #94a3b8;
-    }
-    .log-ok { color: #34d399; }
-    .log-err { color: #f87171; }
-    .log-highlight { color: #38bdf8; }
-  </style>
-</head>
-<body>
-
-<div class="container">
-  <h1>🛍️ Rockfish to Shopify 轉換工具</h1>
-  <p class="subtitle">將 Rockfish 產品網址貼入下方文字框，自動抓取顏色、尺碼、相片並輸出 Shopify CSV。</p>
-
-  <div class="card">
-    <label
+      word-break
