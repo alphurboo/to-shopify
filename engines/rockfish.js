@@ -9,10 +9,55 @@ window.REGISTERED_ENGINES.push({
   parse: function(html, url) {
     var doc = new DOMParser().parseFromString(html, 'text/html');
     var rawTitle = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name')?.innerText || doc.title || 'Product';
-    var parsed = window.ENGINE_UTILS.parseColors(rawTitle, url);
     var root = new URL(url).origin;
 
-    // 1. 價格抓取
+    // --- Rockfish 專屬切字邏輯 ---
+    var t = rawTitle.replace(/Product Name\s*:/i, '').trim();
+    t = t.replace(/^\[.*?\]\s*/i, '').trim();
+    t = t.split(/\s*[-–|]\s*(?:ROCKFISH|WEATHERWEAR)/i)[0].trim();
+    t = t.split('|')[0].trim();
+
+    var color = '';
+    // Rockfish 官網風格：破折號後就是顏色（支援雙字，如 - SKY BLUE, - LIGHT GREY, - MELANGE BROWN）
+    var dashMatch = t.match(/\s*[-–]\s*([A-Za-z\s]+)$/);
+    if (dashMatch) {
+      color = dashMatch[1].trim();
+      t = t.substring(0, dashMatch.index).trim();
+    }
+
+    if (!color) {
+      var lowUrl = url.toLowerCase();
+      var compoundSlugs = [
+        { key: 'sky-blue', name: 'Sky Blue' },
+        { key: 'light-grey', name: 'Light Grey' },
+        { key: 'light-gray', name: 'Light Grey' },
+        { key: 'melange-brown', name: 'Melange Brown' },
+        { key: 'melange-grey', name: 'Melange Grey' }
+      ];
+      for (var k = 0; k < compoundSlugs.length; k++) {
+        if (lowUrl.indexOf(compoundSlugs[k].key) !== -1) {
+          color = compoundSlugs[k].name;
+          break;
+        }
+      }
+      if (!color) {
+        var commonColors = ['blue', 'pink', 'mint', 'beige', 'brown', 'black', 'white', 'silver', 'navy', 'gray', 'grey', 'red', 'green', 'ivory', 'cream', 'khaki', 'camel', 'yellow', 'purple', 'charcoal', 'gold', 'orange', 'oatmeal', 'melange'];
+        for (var c = 0; c < commonColors.length; c++) {
+          var testColor = commonColors[c];
+          var reg = new RegExp('[-_/]' + testColor + '([-_/]|$)', 'i');
+          if (reg.test(lowUrl)) {
+            color = testColor;
+            break;
+          }
+        }
+      }
+    }
+
+    color = color ? color.toLowerCase().split(/\s+/).map(function(w){ return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ') : 'Default Color';
+    t = t.replace(/[\s_-]+$/, '').trim();
+    var cleanHandle = t.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
+
+    // --- 抓價格 ---
     var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
     var price = '0.00';
     if (priceTag) {
@@ -21,7 +66,7 @@ window.REGISTERED_ENGINES.push({
       if (match) price = match[0].replace(/,/g, '');
     }
 
-    // 2. 主圖抓取（剔除 logo_node）
+    // --- 抓圖（過濾 logo_node, naver, pay） ---
     var keyImg = '';
     var allImgs = [];
     var mainEl = doc.querySelector('.keyImg img, .thumbnail img');
@@ -30,14 +75,11 @@ window.REGISTERED_ENGINES.push({
       if (m.indexOf('//') === 0) m = 'https:' + m;
       else if (m.indexOf('/') === 0) m = root + m;
       if (m.indexOf('http://') === 0) m = m.replace('http://', 'https://');
-      
-      var mLow = m.toLowerCase();
-      if (mLow.indexOf('logo') === -1 && mLow.indexOf('node') === -1) {
+      if (m.toLowerCase().indexOf('logo') === -1 && m.toLowerCase().indexOf('node') === -1) {
         keyImg = m;
       }
     }
 
-    // 3. 所有大圖掃描（嚴格過濾 logo_node, naver, pay）
     var imgs = doc.querySelectorAll('img');
     for (var i = 0; i < imgs.length; i++) {
       var s = imgs[i].getAttribute('ec-data-src') || imgs[i].getAttribute('data-original') || imgs[i].getAttribute('src') || '';
@@ -47,13 +89,8 @@ window.REGISTERED_ENGINES.push({
       if (s.indexOf('http://') === 0) s = s.replace('http://', 'https://');
 
       var low = s.toLowerCase();
-      var isJunk = low.indexOf('naver') !== -1 ||
-                   low.indexOf('pay') !== -1 ||
-                   low.indexOf('.gif') !== -1 ||
-                   low.indexOf('icon') !== -1 ||
-                   low.indexOf('blank') !== -1 ||
-                   low.indexOf('logo') !== -1 ||
-                   low.indexOf('node.png') !== -1;
+      var isJunk = low.indexOf('naver') !== -1 || low.indexOf('pay') !== -1 || low.indexOf('.gif') !== -1 ||
+                   low.indexOf('icon') !== -1 || low.indexOf('blank') !== -1 || low.indexOf('logo') !== -1 || low.indexOf('node.png') !== -1;
 
       if (!isJunk && (low.indexOf('/big/') !== -1 || low.indexOf('rockfish.cafe24.com') !== -1)) {
         if (!keyImg) keyImg = s;
@@ -61,8 +98,8 @@ window.REGISTERED_ENGINES.push({
       }
     }
 
-    // 4. 尺碼判斷
-    var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(parsed.title) || /category\/230|shoes/i.test(url);
+    // --- 尺碼 ---
+    var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(t) || /category\/230|shoes/i.test(url);
     var sizes = [];
     var sizeMatch = html.match(/"option_value":\s*"(\d{3})"/g);
     if (sizeMatch) {
@@ -80,8 +117,9 @@ window.REGISTERED_ENGINES.push({
     return {
       vendor: 'Rockfish Weatherwear',
       type: isShoe ? 'Shoes' : 'Bags & Accessories',
-      title: parsed.title,
-      color: parsed.color,
+      title: t,
+      handle: cleanHandle,
+      color: color,
       price: price,
       keyImage: keyImg,
       images: allImgs,
