@@ -40,7 +40,6 @@
     .log-accent { color: #38bdf8; }
   </style>
 
-  <!-- 必須正確載入模組 -->
   <script src="engines/registry.js"></script>
   <script src="engines/mardi.js"></script>
 </head>
@@ -70,6 +69,10 @@
   <script>
     var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
     var textarea = document.getElementById('urlInput');
+
+    function sanitizeHandle(str) {
+      return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
+    }
 
     textarea.addEventListener('paste', function(e) {
       e.preventDefault();
@@ -159,18 +162,11 @@
         return;
       }
 
-      // 檢查 Engine 是否正確載入
-      var engines = window.REGISTERED_ENGINES || [];
-      var engine = engines.find(function(e) { return e.id === 'mardi'; });
-      if (!engine) {
-        alert('錯誤：Mardi Engine 未能成功載入，請確認 engines/mardi.js 是否存在！');
-        return;
-      }
-
+      var engine = window.REGISTERED_ENGINES.find(function(e) { return e.id === 'mardi'; });
       var btn = document.getElementById('startBtn');
       btn.disabled = true;
 
-      printLog('🚀 啟動 Mardi Mercredi 引擎，正在處理 ' + queue.length + ' 個商品...', 'info');
+      printLog('🚀 啟動 Mardi Mercredi 專屬引擎，正在處理 ' + queue.length + ' 個商品...', 'info');
 
       var productGroups = {};
       var concurrency = 5;
@@ -185,7 +181,7 @@
           try {
             var raw = await loadHtml(u);
             var item = engine.parse(raw, u);
-            var handle = window.ENGINE_UTILS.sanitizeHandle(item.title);
+            var handle = item.handle || sanitizeHandle(item.title);
             printLog('✓ 完成: ' + item.title + ' [' + item.color + ']', 'ok');
 
             if (!productGroups[handle]) {
@@ -285,13 +281,10 @@
       if (finalData.length > 0) {
         printLog('🎉 處理完畢！正在自動下載 Shopify CSV...', 'ok');
         downloadCsv(finalData, 'mardi_shopify_' + Date.now() + '.csv');
-      } else {
-        printLog('未獲得任何資料。', 'err');
       }
     }
 
     function downloadCsv(data, filename) {
-      if (!data || data.length === 0) return;
       var keys = Object.keys(data[0]);
       var csv = '\uFEFF' + keys.map(function(k) { return '"' + k + '"'; }).join(',') + '\n';
       for (var i = 0; i < data.length; i++) {
