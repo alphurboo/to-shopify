@@ -1,665 +1,100 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-HK">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>韓國品牌 to Shopify 轉換工具</title>
+  <title>E-Commerce to Shopify 工具導航</title>
   <style>
-    html, body {
-      background: #0f172a !important;
-      color: #f8fafc !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       margin: 0;
-      padding: 0;
-      min-height: 100%;
+      padding: 60px 20px;
+      display: flex;
+      justify-content: center;
     }
-
-    .main-wrapper {
-      max-width: 860px;
-      margin: 40px auto;
-      padding: 0 20px;
-      display: block;
+    .container {
+      width: 100%;
+      max-width: 640px;
+      text-align: center;
     }
-
-    .header-title {
+    h1 {
       color: #38bdf8;
-      font-size: 26px;
-      font-weight: 700;
-      margin-bottom: 6px;
+      font-size: 28px;
+      margin-bottom: 10px;
     }
-
-    .header-desc {
+    p {
       color: #94a3b8;
       font-size: 14px;
-      margin-bottom: 24px;
-      line-height: 1.5;
+      margin-bottom: 36px;
     }
-
-    .card-box {
+    .grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .card-btn {
+      display: block;
       background: #1e293b;
       border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 24px;
-      display: block;
-    }
-
-    .field-label {
-      display: block;
+      border-radius: 10px;
+      padding: 20px;
+      text-decoration: none;
       color: #ffffff;
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 8px;
+      text-align: left;
+      transition: all 0.2s ease;
     }
-
-    .brand-select {
-      display: block;
-      width: 100%;
-      height: 40px;
-      background: #020617;
+    .card-btn:hover {
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+      background: #243248;
+    }
+    .card-btn h3 {
+      margin: 0 0 6px 0;
+      font-size: 18px;
       color: #38bdf8;
-      border: 1.5px solid #475569;
-      border-radius: 6px;
-      padding: 0 12px;
-      font-size: 14px;
-      font-weight: 600;
-      outline: none;
-      margin-bottom: 18px;
-      cursor: pointer;
-    }
-
-    .brand-select:focus {
-      border-color: #38bdf8;
-    }
-
-    #urlInput {
-      display: block;
-      width: 100%;
-      height: 180px;
-      background: #020617;
-      color: #ffffff;
-      border: 1px solid #475569;
-      border-radius: 6px;
-      padding: 12px;
-      font-size: 14px;
-      box-sizing: border-box;
-      outline: none;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    #urlInput:focus {
-      border-color: #38bdf8;
-    }
-
-    .btn-bar {
-      margin-top: 16px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      justify-content: space-between;
     }
-
-    button {
-      padding: 11px 22px;
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      transition: background-color 0.2s, opacity 0.2s;
-    }
-
-    .btn-blue { background: #0284c7; color: #ffffff; }
-    .btn-blue:hover { background: #0369a1; }
-    .btn-blue:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #475569; }
-    .btn-outline:hover { background: #334155; color: #ffffff; }
-
-    .counter-text {
-      color: #38bdf8;
+    .card-btn p {
+      margin: 0;
+      color: #94a3b8;
       font-size: 13px;
-      font-weight: 600;
-      margin-left: auto;
     }
-
-    #consoleBox {
-      margin-top: 20px;
-      background: #020617;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      padding: 14px;
-      height: 180px;
-      overflow-y: scroll;
-      font-family: monospace;
-      font-size: 13px;
-      line-height: 1.6;
-      box-sizing: border-box;
+    .badge {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #0369a1;
+      color: #ffffff;
     }
-
-    .log-row { color: #94a3b8; word-break: break-all; }
-    .log-success { color: #34d399; }
-    .log-error { color: #f87171; }
-    .log-accent { color: #38bdf8; }
   </style>
 </head>
 <body>
 
-  <div class="main-wrapper">
-    <div class="header-title">🛍️ 韓國品牌 to Shopify 轉換工具</div>
-    <div class="header-desc">選擇目標網站，自動以專屬引擎抓取商品圖、Model 相片、顏色尺碼並輸出 Shopify CSV。</div>
+<div class="container">
+  <h1>🛍️ Shopify 轉換工具中心</h1>
+  <p>請選擇你今日需要搬運的品牌站點，或使用測試工具進行對比：</p>
 
-    <div class="card-box">
-      <label class="field-label" for="brandSelect">🎯 請選擇來源品牌／網站：</label>
-      <select id="brandSelect" class="brand-select">
-        <option value="auto">🌐 自動偵測品牌（Auto Detect）</option>
-        <option value="rockfish">👢 Rockfish Weatherwear</option>
-        <option value="mardi">🌸 Mardi Mercredi</option>
-      </select>
+  <div class="grid">
+    <a href="rockfish.html" class="card-btn">
+      <h3>👢 Rockfish Weatherwear <span class="badge">專屬</span></h3>
+      <p>專門支援鞋碼自動匹配（230-255）、手袋免碼、extra/big 高清模特相與顏色合併。</p>
+    </a>
 
-      <label class="field-label" for="urlInput">商品網址列表（貼上自動跳下一行）：</label>
-      <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://mardimercredi.com/product/wool-muffler-checkblue/13895/category/527/display/1/"></textarea>
+    <a href="mardi.html" class="card-btn">
+      <h3>🌸 Mardi Mercredi <span class="badge">專屬</span></h3>
+      <p>專門修正長條圖壓縮問題、優先抓取正方形平鋪主圖、精準切除韓文字綴。</p>
+    </a>
 
-      <div class="btn-bar">
-        <button type="button" id="startBtn" class="btn-blue" onclick="processAllParallel()">🚀 一鍵抓取並自動下載 CSV</button>
-        <button type="button" class="btn-outline" onclick="resetForm()">清空</button>
-        <span id="urlCount" class="counter-text">已輸入：0 個商品</span>
-      </div>
-
-      <div id="consoleBox">
-        <div class="log-row">系統就緒，選擇品牌並貼上網址後，點擊「一鍵抓取並自動下載 CSV」。</div>
-      </div>
-    </div>
+    <a href="test.html" class="card-btn">
+      <h3>🧪 多引擎測試工具 (Test Engine) <span class="badge" style="background:#7c3aed;">對比測試</span></h3>
+      <p>貼入未知新品牌，同時以 Rockfish 與 Mardi 引擎解析並分別匯出 CSV 對比效果。</p>
+    </a>
   </div>
+</div>
 
-  <script>
-    var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
-    var finalData = [];
-
-    var textarea = document.getElementById('urlInput');
-
-    textarea.addEventListener('paste', function(e) {
-      e.preventDefault();
-      var pastedText = (e.clipboardData || window.clipboardData).getData('text');
-      if (!pastedText) return;
-
-      var current = this.value;
-      var start = this.selectionStart;
-      var end = this.selectionEnd;
-
-      var toInsert = pastedText.trim();
-      if (!toInsert.endsWith('\n')) {
-        toInsert += '\n';
-      }
-
-      var before = current.substring(0, start);
-      var after = current.substring(end);
-
-      if (before.length > 0 && !before.endsWith('\n')) {
-        toInsert = '\n' + toInsert;
-      }
-
-      this.value = before + toInsert + after;
-      var newPos = (before + toInsert).length;
-      this.selectionStart = newPos;
-      this.selectionEnd = newPos;
-
-      updateCount();
-    });
-
-    textarea.addEventListener('input', updateCount);
-
-    function getValidUrls() {
-      var lines = textarea.value.split('\n');
-      var clean = [];
-      for (var i = 0; i < lines.length; i++) {
-        var str = lines[i].trim();
-        if (str.indexOf('http://') === 0 || str.indexOf('https://') === 0) {
-          if (clean.indexOf(str) === -1) clean.push(str);
-        }
-      }
-      return clean;
-    }
-
-    function updateCount() {
-      var urls = getValidUrls();
-      document.getElementById('urlCount').innerText = '已輸入：' + urls.length + ' 個商品';
-    }
-
-    function printLog(text, type) {
-      var box = document.getElementById('consoleBox');
-      var div = document.createElement('div');
-      div.className = 'log-row';
-      if (type === 'ok') div.className += ' log-success';
-      if (type === 'err') div.className += ' log-error';
-      if (type === 'info') div.className += ' log-accent';
-
-      var now = new Date();
-      var timeStr = now.toTimeString().split(' ')[0];
-      div.innerText = '[' + timeStr + '] ' + text;
-      box.appendChild(div);
-      box.scrollTop = box.scrollHeight;
-    }
-
-    function resetForm() {
-      textarea.value = '';
-      finalData = [];
-      updateCount();
-      printLog('已清空所有內容。', 'info');
-    }
-
-    function sanitizeHandle(str) {
-      return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
-    }
-
-    // 智能識別品牌模式
-    function getSelectedBrand(url) {
-      var sel = document.getElementById('brandSelect').value;
-      if (sel !== 'auto') return sel;
-
-      var low = url.toLowerCase();
-      if (low.indexOf('mardimercredi') !== -1) return 'mardi';
-      if (low.indexOf('rockfish') !== -1) return 'rockfish';
-      return 'auto';
-    }
-
-    function parseTitleAndColor(rawTitle, productUrl, brandMode) {
-      var t = rawTitle.replace(/Product Name\s*:/i, '').trim();
-      t = t.replace(/^\[.*?\]\s*/i, '').trim();
-
-      // 切除品牌後綴與韓文字
-      t = t.replace(/\s*[-–|]\s*(MARDI MERCREDI|ROCKFISH|WEATHERWEAR|마르디|메크르디).*$/i, '').trim();
-      t = t.replace(/\s*\|.*$/, '').trim();
-
-      var color = '';
-
-      // 提取標題底線或破折號顏色 (例如 CHECK_BLUE 或 - BLUE)
-      var colorMatch = t.match(/[\s_-]+(BLUE|PINK|MINT|BEIGE|BROWN|BLACK|WHITE|SILVER|NAVY|GRAY|GREY|RED|GREEN|IVORY|CREAM|KHAKI|CAMEL|YELLOW|PURPLE|CHARCOAL|GOLD|ORANGE|OATMEAL)$/i);
-      if (colorMatch) {
-        color = colorMatch[1].trim();
-        t = t.substring(0, colorMatch.index).trim();
-      }
-
-      if (!color) {
-        var lowUrl = productUrl.toLowerCase();
-        var commonColors = ['blue', 'pink', 'mint', 'beige', 'brown', 'black', 'white', 'silver', 'navy', 'gray', 'grey', 'red', 'green', 'ivory', 'cream', 'khaki', 'camel', 'yellow', 'purple', 'charcoal', 'gold', 'orange', 'oatmeal'];
-        for (var c = 0; c < commonColors.length; c++) {
-          var testColor = commonColors[c];
-          var reg = new RegExp('[-_/]' + testColor + '([-_/]|$)', 'i');
-          if (reg.test(lowUrl)) {
-            color = testColor;
-            break;
-          }
-        }
-      }
-
-      if (color) {
-        color = color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
-      } else {
-        color = 'Default Color';
-      }
-
-      t = t.replace(/[\s_-]+$/, '').trim();
-      return { cleanTitle: t, color: color };
-    }
-
-    async function loadHtml(url) {
-      try {
-        var res = await fetch(WORKER_PROXY + encodeURIComponent(url));
-        if (res.ok) {
-          var text = await res.text();
-          if (text && text.length > 300) return text;
-        }
-      } catch (e) {}
-
-      var fallbacks = [
-        'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
-        'https://corsproxy.io/?' + encodeURIComponent(url)
-      ];
-      for (var f = 0; f < fallbacks.length; f++) {
-        try {
-          var fbRes = await fetch(fallbacks[f]);
-          if (fbRes.ok) {
-            var fbText = await fbRes.text();
-            if (fbText && fbText.length > 300) return fbText;
-          }
-        } catch (err) {}
-      }
-      throw new Error('無法存取該頁面');
-    }
-
-    // 專屬品牌解析引擎
-    function extractProductByBrand(html, productUrl, brandMode) {
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
-
-      var vendor = 'Brand Boutique';
-      if (brandMode === 'mardi') vendor = 'Mardi Mercredi';
-      else if (brandMode === 'rockfish') vendor = 'Rockfish Weatherwear';
-
-      var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name');
-      var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
-      if (!rawTitle && doc.title) rawTitle = doc.title;
-
-      var info = parseTitleAndColor(rawTitle, productUrl, brandMode);
-      var title = info.cleanTitle;
-      var currentColor = info.color;
-
-      // 價格
-      var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
-      var price = '0.00';
-      if (priceTag) {
-        var pText = priceTag.getAttribute('content') || priceTag.innerText || '';
-        var match = pText.match(/[\d,.]+/);
-        if (match) price = match[0].replace(/,/g, '');
-      }
-
-      var uri = new URL(productUrl);
-      var root = uri.origin;
-      var keyProductImg = '';
-      var cleanModelImgs = [];
-
-      // ==========================================
-      // 模式 A：MARDI MERCREDI 專屬圖片邏輯
-      // ==========================================
-      if (brandMode === 'mardi') {
-        // 1. 先抓 NNEditor 內文真正圍巾/商品高清大圖（例：WOOL20CHECK20MUFFLER_PINK.jpg）
-        var editorImgs = doc.querySelectorAll('#prdDetail img, .detail_view img, div[class*="editor"] img');
-        for (var i = 0; i < editorImgs.length; i++) {
-          var src = editorImgs[i].getAttribute('src') || editorImgs[i].getAttribute('ec-data-src') || '';
-          if (src) {
-            if (src.indexOf('//') === 0) src = 'https:' + src;
-            else if (src.indexOf('/') === 0) src = root + src;
-            if (src.indexOf('http://') === 0) src = src.replace('http://', 'https://');
-
-            var low = src.toLowerCase();
-            // 嚴格黑名單：徹底剔除選單、海報、Logo、付款標籤
-            var isJunk = low.indexOf('meta_logo') !== -1 || low.indexOf('promotion') !== -1 || 
-                         low.indexOf('submenu') !== -1 || low.indexOf('collection_sub') !== -1 || 
-                         low.indexOf('banner') !== -1 || low.indexOf('naver') !== -1 || low.indexOf('pay') !== -1;
-
-            if (!isJunk && (low.indexOf('nneditor') !== -1 || low.indexOf('/upload/') !== -1 || low.indexOf('/big/') !== -1)) {
-              if (cleanModelImgs.indexOf(src) === -1) {
-                cleanModelImgs.push(src);
-              }
-            }
-          }
-        }
-
-        // 2. 主縮圖
-        var mainEl = doc.querySelector('.keyImg img, .thumbnail img');
-        if (mainEl) {
-          var m = mainEl.getAttribute('src') || mainEl.getAttribute('ec-data-src') || '';
-          if (m.indexOf('//') === 0) m = 'https:' + m;
-          else if (m.indexOf('/') === 0) m = root + m;
-          if (m.indexOf('http://') === 0) m = m.replace('http://', 'https://');
-          if (m.toLowerCase().indexOf('meta_logo') === -1) {
-            keyProductImg = m;
-          }
-        }
-
-        // 如果主圖是空或抓到 logo，用第一張 NNEditor 真身圖當主圖
-        if (!keyProductImg && cleanModelImgs.length > 0) {
-          keyProductImg = cleanModelImgs[0];
-        }
-      }
-
-      // ==========================================
-      // 模式 B：ROCKFISH 專屬圖片邏輯
-      // ==========================================
-      else {
-        var mainEl = doc.querySelector('.keyImg img, .thumbnail img');
-        if (mainEl) {
-          var m = mainEl.getAttribute('src') || mainEl.getAttribute('ec-data-src') || '';
-          if (m.indexOf('//') === 0) m = 'https:' + m;
-          else if (m.indexOf('/') === 0) m = root + m;
-          if (m.indexOf('http://') === 0) m = m.replace('http://', 'https://');
-          keyProductImg = m;
-        }
-
-        var rkImgs = doc.querySelectorAll('img');
-        for (var j = 0; j < rkImgs.length; j++) {
-          var rkSrc = rkImgs[j].getAttribute('ec-data-src') || rkImgs[j].getAttribute('data-original') || rkImgs[j].getAttribute('src') || '';
-          if (rkSrc.indexOf('/small/') !== -1) rkSrc = rkSrc.replace('/small/', '/big/');
-
-          if (rkSrc) {
-            if (rkSrc.indexOf('//') === 0) rkSrc = 'https:' + rkSrc;
-            else if (rkSrc.indexOf('/') === 0) rkSrc = root + rkSrc;
-            if (rkSrc.indexOf('http://') === 0) rkSrc = rkSrc.replace('http://', 'https://');
-
-            var lowRk = rkSrc.toLowerCase();
-            var isJunkRk = lowRk.indexOf('naver') !== -1 || lowRk.indexOf('pay') !== -1 || lowRk.indexOf('icon') !== -1 || lowRk.indexOf('blank') !== -1 || lowRk.indexOf('.gif') !== -1;
-
-            if (!isJunkRk && (lowRk.indexOf('/big/') !== -1 || lowRk.indexOf('rockfish.cafe24.com') !== -1)) {
-              if (!keyProductImg) keyProductImg = rkSrc;
-              if (cleanModelImgs.indexOf(rkSrc) === -1 && rkSrc !== keyProductImg) {
-                cleanModelImgs.push(rkSrc);
-              }
-            }
-          }
-        }
-      }
-
-      // 尺碼判定
-      var sizes = [];
-      var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(title) || /category\/230|shoes/i.test(productUrl);
-
-      if (brandMode === 'rockfish' && isShoe) {
-        sizes = ['230', '235', '240', '245', '250', '255'];
-      }
-
-      return {
-        vendor: vendor,
-        title: title,
-        handle: sanitizeHandle(title),
-        price: price,
-        keyImage: keyProductImg,
-        modelImages: cleanModelImgs,
-        color: currentColor,
-        sizes: sizes,
-        description: '',
-        sourceUrl: productUrl
-      };
-    }
-
-    async function processAllParallel() {
-      var queue = getValidUrls();
-      if (queue.length === 0) {
-        alert('請先在輸入框貼上至少一條以 http:// 或 https:// 開頭的網址！');
-        return;
-      }
-
-      var btn = document.getElementById('startBtn');
-      btn.disabled = true;
-      finalData = [];
-
-      printLog('🚀 啟動極速引擎，正在抓取 ' + queue.length + ' 個商品...', 'info');
-
-      var productGroups = {};
-      var concurrency = 5;
-      var currentIndex = 0;
-
-      async function worker() {
-        while (currentIndex < queue.length) {
-          var idx = currentIndex++;
-          var u = queue[idx];
-          var mode = getSelectedBrand(u);
-          printLog('正在讀取 (' + (idx + 1) + '/' + queue.length + ') [' + mode.toUpperCase() + ']: ' + u);
-
-          try {
-            var raw = await loadHtml(u);
-            var item = extractProductByBrand(raw, u, mode);
-            var sizeMsg = item.sizes.length > 0 ? ('碼:' + item.sizes.join('/')) : '無尺碼規格';
-            printLog('✓ 完成 (' + (idx + 1) + '): [' + item.vendor + '] ' + item.title + ' [' + item.color + '] (' + sizeMsg + ', 高清圖:' + item.modelImages.length + '張)', 'ok');
-
-            if (!productGroups[item.handle]) {
-              productGroups[item.handle] = {
-                vendor: item.vendor,
-                handle: item.handle,
-                title: item.title,
-                price: item.price,
-                description: item.description,
-                sourceUrls: [],
-                colorImages: {},
-                productImages: [],
-                modelImages: [],
-                variants: [],
-                hasSize: false
-              };
-            }
-
-            if (productGroups[item.handle].sourceUrls.indexOf(item.sourceUrl) === -1) {
-              productGroups[item.handle].sourceUrls.push(item.sourceUrl);
-            }
-
-            if (item.keyImage) {
-              productGroups[item.handle].colorImages[item.color] = item.keyImage;
-              if (productGroups[item.handle].productImages.indexOf(item.keyImage) === -1) {
-                productGroups[item.handle].productImages.push(item.keyImage);
-              }
-            }
-
-            for (var m = 0; m < item.modelImages.length; m++) {
-              var mPic = item.modelImages[m];
-              if (productGroups[item.handle].modelImages.length < 12) {
-                if (productGroups[item.handle].modelImages.indexOf(mPic) === -1 && productGroups[item.handle].productImages.indexOf(mPic) === -1) {
-                  productGroups[item.handle].modelImages.push(mPic);
-                }
-              }
-            }
-
-            if (item.sizes.length > 0) {
-              productGroups[item.handle].hasSize = true;
-              for (var s = 0; s < item.sizes.length; s++) {
-                var exists = false;
-                for (var vIdx = 0; vIdx < productGroups[item.handle].variants.length; vIdx++) {
-                  var ex = productGroups[item.handle].variants[vIdx];
-                  if (ex.color === item.color && ex.size === item.sizes[s]) {
-                    exists = true; break;
-                  }
-                }
-                if (!exists) {
-                  productGroups[item.handle].variants.push({
-                    color: item.color,
-                    size: item.sizes[s],
-                    price: item.price
-                  });
-                }
-              }
-            } else {
-              var existsColor = false;
-              for (var cIdx = 0; cIdx < productGroups[item.handle].variants.length; cIdx++) {
-                if (productGroups[item.handle].variants[cIdx].color === item.color) {
-                  existsColor = true; break;
-                }
-              }
-              if (!existsColor) {
-                productGroups[item.handle].variants.push({
-                  color: item.color,
-                  size: '',
-                  price: item.price
-                });
-              }
-            }
-          } catch (err) {
-            printLog('✗ 失敗 (' + (idx + 1) + '): ' + err.message, 'err');
-          }
-        }
-      }
-
-      var pool = [];
-      for (var i = 0; i < Math.min(concurrency, queue.length); i++) {
-        pool.push(worker());
-      }
-      await Promise.all(pool);
-
-      // 排版 Shopify CSV
-      var groupKeys = Object.keys(productGroups);
-      for (var g = 0; g < groupKeys.length; g++) {
-        var grp = productGroups[groupKeys[g]];
-
-        var finalGallery = grp.productImages.concat(grp.modelImages);
-        var rowCount = Math.max(grp.variants.length, finalGallery.length);
-        var sourceNote = grp.sourceUrls.join('\n');
-
-        for (var r = 0; r < rowCount; r++) {
-          var isFirstRow = (r === 0);
-          var v = grp.variants[r] || null;
-          var img = finalGallery[r] || '';
-
-          var variantImg = '';
-          if (v && grp.colorImages[v.color]) {
-            variantImg = grp.colorImages[v.color];
-          }
-
-          var row = {
-            "Handle": grp.handle,
-            "Title": isFirstRow ? grp.title : '',
-            "Body (HTML)": "",
-            "Vendor": isFirstRow ? grp.vendor : '',
-            "Type": isFirstRow ? (grp.hasSize ? 'Shoes' : 'Accessories') : '',
-            "Tags": isFirstRow ? 'Korea, Fashion, ' + grp.vendor : '',
-            "Published": "FALSE",
-            "Option1 Name": "Color",
-            "Option1 Value": v ? v.color : ''
-          };
-
-          if (grp.hasSize) {
-            row["Option2 Name"] = "Size";
-            row["Option2 Value"] = v ? v.size : '';
-          } else {
-            row["Option2 Name"] = "";
-            row["Option2 Value"] = "";
-          }
-
-          row["Variant Price"] = v ? v.price : '';
-          row["Variant Requires Shipping"] = v ? 'TRUE' : '';
-          row["Variant Taxable"] = v ? 'TRUE' : '';
-          row["Variant Inventory Tracker"] = v ? "shopify" : "";
-          row["Variant Inventory Policy"] = v ? "continue" : "";
-          row["Image Src"] = img;
-          row["Image Position"] = img ? (r + 1) : '';
-          row["Variant Image"] = variantImg;
-          row["Internal Note (product.metafields.custom.internal_note)"] = isFirstRow ? sourceNote : '';
-          row["Status"] = isFirstRow ? 'draft' : '';
-
-          finalData.push(row);
-        }
-      }
-
-      btn.disabled = false;
-      if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！已精準抓取專屬商品相片，正在下載 CSV...', 'ok');
-        downloadCsvFile();
-      } else {
-        printLog('未獲得任何資料。', 'err');
-      }
-    }
-
-    function downloadCsvFile() {
-      if (finalData.length === 0) return;
-
-      var keys = Object.keys(finalData[0]);
-      var csv = '\uFEFF';
-      csv += keys.map(function(k) { return '"' + k + '"'; }).join(',') + '\n';
-
-      for (var i = 0; i < finalData.length; i++) {
-        var row = finalData[i];
-        var line = keys.map(function(k) {
-          var val = row[k] !== undefined ? String(row[k]) : '';
-          return '"' + val.replace(/"/g, '""') + '"';
-        }).join(',');
-        csv += line + '\n';
-      }
-
-      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      var link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'shopify_import_' + Date.now() + '.csv';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-  </script>
 </body>
 </html>
