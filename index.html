@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>to-Shopify</title>
+  <title>通用電商 to Shopify 轉換工具</title>
   <style>
     html, body {
       background: #0f172a !important;
@@ -126,15 +126,15 @@
 <body>
 
   <div class="main-wrapper">
-    <div class="header-title">🛍️ to-Shopify</div>
-    <div class="header-desc"></div>
+    <div class="header-title">🛍️ 通用品牌 to Shopify 轉換工具</div>
+    <div class="header-desc">支援 Rockfish、Mardi Mercredi 及其他韓國品牌：智慧識別 Vendor、過濾韓文與品牌尾綴、自動合併同款顏色並匯出 CSV。</div>
 
     <div class="card-box">
-      <label class="field-label" for="urlInput">商品網址列表：</label>
-      <textarea id="urlInput" placeholder="請在此貼上連結"></textarea>
+      <label class="field-label" for="urlInput">商品網址列表（貼上自動跳下一行，支援多條連續貼入）：</label>
+      <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://mardimercredi.com/product/wool-muffler-checkblue/13895/category/527/display/1/"></textarea>
 
       <div class="btn-bar">
-        <button type="button" id="startBtn" class="btn-blue" onclick="processAllParallel()">抓取</button>
+        <button type="button" id="startBtn" class="btn-blue" onclick="processAllParallel()">🚀 一鍵抓取並自動下載 CSV</button>
         <button type="button" class="btn-outline" onclick="resetForm()">清空</button>
         <span id="urlCount" class="counter-text">已輸入：0 個商品</span>
       </div>
@@ -151,7 +151,6 @@
 
     var textarea = document.getElementById('urlInput');
 
-    // 貼上時自動跳下一行，並即時更新商品計數
     textarea.addEventListener('paste', function(e) {
       e.preventDefault();
       var pastedText = (e.clipboardData || window.clipboardData).getData('text');
@@ -161,7 +160,6 @@
       var start = this.selectionStart;
       var end = this.selectionEnd;
 
-      // 確保貼上的文字以換行結尾
       var toInsert = pastedText.trim();
       if (!toInsert.endsWith('\n')) {
         toInsert += '\n';
@@ -170,7 +168,6 @@
       var before = current.substring(0, start);
       var after = current.substring(end);
 
-      // 如果當前行前面有內容且不是剛好在換行後，先補一個換行
       if (before.length > 0 && !before.endsWith('\n')) {
         toInsert = '\n' + toInsert;
       }
@@ -228,25 +225,57 @@
       return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
     }
 
+    // 智能識別 Vendor 品牌名稱
+    function detectVendor(url, doc) {
+      var host = '';
+      try {
+        host = new URL(url).hostname.toLowerCase();
+      } catch (e) {}
+
+      if (host.indexOf('mardimercredi') !== -1) return 'Mardi Mercredi';
+      if (host.indexOf('rockfish') !== -1) return 'Rockfish Weatherwear';
+      if (host.indexOf('marithe') !== -1) return 'Marithé François Girbaud';
+      if (host.indexOf('matinkim') !== -1) return 'Matin Kim';
+      if (host.indexOf('standoil') !== -1) return 'Stand Oil';
+
+      // 從 og:site_name 提取
+      var siteMeta = doc.querySelector('meta[property="og:site_name"]');
+      if (siteMeta && siteMeta.getAttribute('content')) {
+        return siteMeta.getAttribute('content').split(/[-|]/)[0].trim();
+      }
+
+      // 從網域名稱自動轉換 (如 brandname.com -> Brandname)
+      var cleanHost = host.replace(/^www\./, '').replace(/\.(com|co\.kr|kr|net|org)$/, '');
+      return cleanHost.charAt(0).toUpperCase() + cleanHost.slice(1);
+    }
+
+    // 智能清洗標題、去除品牌名及韓文尾綴、提取顏色
     function parseUniversalTitleAndColor(rawTitle, productUrl) {
       var t = rawTitle.replace(/Product Name\s*:/i, '').trim();
       t = t.replace(/^\[.*?\]\s*/i, '').trim();
 
+      // 1. 去除尾部的品牌名與韓文字 (例如 - MARDI MERCREDI | 마르디 메크르디)
+      t = t.replace(/\s*[-–|]\s*(MARDI MERCREDI|ROCKFISH|WEATHERWEAR|마르디|메크르디).*$/i, '').trim();
+      t = t.replace(/\s*\|.*$/, '').trim();
+
       var color = '';
-      var dashMatch = t.match(/\s*[-–|]\s*([A-Za-z\s]+)$/);
-      if (dashMatch) {
-        color = dashMatch[1].trim();
-        t = t.replace(/\s*[-–|]\s*([A-Za-z\s]+)$/, '').trim();
+
+      // 2. 從標題後方提取底線或橫線顏色 (例如 CHECK_BLUE 或 - BLUE)
+      var colorMatch = t.match(/[\s_-]+(BLUE|PINK|MINT|BEIGE|BROWN|BLACK|WHITE|SILVER|NAVY|GRAY|GREY|RED|GREEN|IVORY|CREAM|KHAKI|CAMEL|YELLOW|PURPLE|CHARCOAL|GOLD|ORANGE|OATMEAL)$/i);
+      if (colorMatch) {
+        color = colorMatch[1].trim();
+        t = t.substring(0, colorMatch.index).trim();
       }
 
+      // 3. 若標題未標示顏色，從 URL slug 智慧提取
       if (!color) {
         var lowUrl = productUrl.toLowerCase();
-        var commonColors = ['beige', 'brown', 'black', 'white', 'pink', 'silver', 'navy', 'gray', 'grey', 'red', 'green', 'blue', 'ivory', 'cream', 'khaki', 'camel', 'yellow', 'purple', 'charcoal', 'gold'];
+        var commonColors = ['blue', 'pink', 'mint', 'beige', 'brown', 'black', 'white', 'silver', 'navy', 'gray', 'grey', 'red', 'green', 'ivory', 'cream', 'khaki', 'camel', 'yellow', 'purple', 'charcoal', 'gold', 'orange', 'oatmeal'];
         for (var c = 0; c < commonColors.length; c++) {
           var testColor = commonColors[c];
           var reg = new RegExp('[-_/]' + testColor + '([-_/]|$)', 'i');
           if (reg.test(lowUrl)) {
-            color = testColor.charAt(0).toUpperCase() + testColor.slice(1);
+            color = testColor;
             break;
           }
         }
@@ -257,6 +286,9 @@
       } else {
         color = 'Default Color';
       }
+
+      // 去除結尾多餘底線或破折號
+      t = t.replace(/[\s_-]+$/, '').trim();
 
       return { cleanTitle: t, color: color };
     }
@@ -335,16 +367,22 @@
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, 'text/html');
 
+      // 1. Vendor
+      var vendor = detectVendor(productUrl, doc);
+
+      // 2. 標題與顏色
       var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name');
       var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
-      if (!rawTitle && doc.title) rawTitle = doc.title.split(/[-–|]/)[0].trim();
+      if (!rawTitle && doc.title) rawTitle = doc.title;
 
       var info = parseUniversalTitleAndColor(rawTitle, productUrl);
       var title = info.cleanTitle;
       var currentColor = info.color;
 
+      // 3. 描述
       var cleanDesc = parseCleanDescription(doc);
 
+      // 4. 價格
       var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
       var price = '0.00';
       if (priceTag) {
@@ -353,6 +391,7 @@
         if (match) price = match[0].replace(/,/g, '');
       }
 
+      // 5. 圖片提取
       var uri = new URL(productUrl);
       var root = uri.origin;
       var keyProductImg = '';
@@ -397,7 +436,7 @@
                        low.indexOf('.gif') !== -1;
 
           if (!isJunk) {
-            if (low.indexOf('/big/') !== -1 || low.indexOf('rockfish.cafe24.com') !== -1) {
+            if (low.indexOf('/big/') !== -1 || low.indexOf('nneditor') !== -1 || low.indexOf('upload') !== -1 || low.indexOf('cafe24.com') !== -1) {
               if (!keyProductImg) keyProductImg = src;
               if (cleanModelImgs.indexOf(src) === -1 && src !== keyProductImg) {
                 cleanModelImgs.push(src);
@@ -407,6 +446,7 @@
         }
       }
 
+      // 6. 尺碼判定
       var sizes = [];
       var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(title) || /category\/230|shoes/i.test(productUrl);
 
@@ -425,6 +465,7 @@
       }
 
       return {
+        vendor: vendor,
         title: title,
         handle: sanitizeHandle(title),
         price: price,
@@ -464,10 +505,11 @@
             var raw = await loadHtml(u);
             var item = extractUniversalProduct(raw, u);
             var sizeMsg = item.sizes.length > 0 ? ('碼:' + item.sizes.join('/')) : '無尺碼規格';
-            printLog('✓ 完成 (' + (idx + 1) + '): ' + item.title + ' [' + item.color + '] (' + sizeMsg + ', 高清圖:' + item.modelImages.length + '張)', 'ok');
+            printLog('✓ 完成 (' + (idx + 1) + '): [' + item.vendor + '] ' + item.title + ' [' + item.color + '] (' + sizeMsg + ')', 'ok');
 
             if (!productGroups[item.handle]) {
               productGroups[item.handle] = {
+                vendor: item.vendor,
                 handle: item.handle,
                 title: item.title,
                 price: item.price,
@@ -583,9 +625,9 @@
             "Handle": grp.handle,
             "Title": isFirstRow ? grp.title : '',
             "Body (HTML)": isFirstRow ? descHtml : '',
-            "Vendor": isFirstRow ? 'Rockfish Weatherwear' : '',
-            "Type": isFirstRow ? (grp.hasSize ? 'Shoes' : 'Bags & Accessories') : '',
-            "Tags": isFirstRow ? 'Korea, Fashion, 代購' : '',
+            "Vendor": isFirstRow ? grp.vendor : '',
+            "Type": isFirstRow ? (grp.hasSize ? 'Shoes' : 'Accessories') : '',
+            "Tags": isFirstRow ? 'Korea, Fashion, ' + grp.vendor : '',
             "Published": "FALSE",
             "Option1 Name": "Color",
             "Option1 Value": v ? v.color : ''
@@ -616,8 +658,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！正在為你自動下載 Shopify CSV...', 'ok');
-        // 自動觸發下載 CSV
+        printLog('🎉 全部處理完成！已自動精準識別 Vendor 並純化標題，正在下載 CSV...', 'ok');
         downloadCsvFile();
       } else {
         printLog('未獲得任何資料。', 'err');
