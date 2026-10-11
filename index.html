@@ -1,143 +1,163 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rockfish to Shopify 轉換工具</title>
   <style>
-    * {
-      box-sizing: border-box;
+    html, body {
+      background: #0f172a !important;
+      color: #f8fafc !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 0;
+      min-height: 100%;
     }
-    body {
-      background-color: #0b0f19;
-      color: #e2e8f0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 40px 20px;
-      display: flex;
-      justify-content: center;
+
+    .main-wrapper {
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 0 20px;
+      display: block;
     }
-    .container {
-      width: 100%;
-      max-width: 840px;
-    }
-    h1 {
-      font-size: 26px;
+
+    .header-title {
       color: #38bdf8;
-      margin-bottom: 8px;
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 6px;
     }
-    p.subtitle {
+
+    .header-desc {
       color: #94a3b8;
       font-size: 14px;
       margin-bottom: 24px;
+      line-height: 1.5;
     }
-    .card {
-      background-color: #1e293b;
+
+    .card-box {
+      background: #1e293b;
       border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 24px;
-    }
-    label {
-      display: block;
-      font-weight: 600;
-      font-size: 14px;
-      margin-bottom: 10px;
-      color: #f1f5f9;
-    }
-    textarea {
-      width: 100%;
-      height: 180px;
-      background-color: #0f172a;
-      border: 1.5px solid #475569;
       border-radius: 8px;
-      padding: 14px;
+      padding: 24px;
+      display: block;
+    }
+
+    .field-label {
+      display: block;
       color: #ffffff;
       font-size: 14px;
-      line-height: 1.5;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    #urlInput {
+      display: block;
+      width: 100%;
+      height: 160px;
+      background: #020617;
+      color: #ffffff;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 14px;
+      box-sizing: border-box;
       outline: none;
       resize: vertical;
-      cursor: text;
-      user-select: text;
-      -webkit-user-select: text;
     }
-    textarea:focus {
+
+    #urlInput:focus {
       border-color: #38bdf8;
-      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
     }
-    .btn-group {
+
+    .btn-bar {
       margin-top: 16px;
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
+      display: block;
     }
+
     button {
-      padding: 11px 20px;
-      border: none;
-      border-radius: 7px;
-      font-weight: 600;
+      padding: 10px 18px;
       font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
       cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: opacity 0.2s, background-color 0.2s;
+      margin-right: 8px;
+      margin-bottom: 8px;
     }
-    .btn-confirm {
-      background-color: #475569;
+
+    .btn-gray {
+      background: #475569;
       color: #ffffff;
     }
-    .btn-confirm:hover {
-      background-color: #64748b;
-    }
-    .btn-run {
-      background-color: #0284c7;
+    .btn-gray:hover { background: #64748b; }
+
+    .btn-blue {
+      background: #0284c7;
       color: #ffffff;
     }
-    .btn-run:hover:not(:disabled) {
-      background-color: #0369a1;
-    }
-    .btn-run:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-    .btn-download {
-      background-color: #10b981;
+    .btn-blue:hover { background: #0369a1; }
+
+    .btn-green {
+      background: #10b981;
       color: #ffffff;
       display: none;
     }
-    .btn-download:hover {
-      background-color: #059669;
-    }
-    .btn-clear {
-      background-color: transparent;
+    .btn-green:hover { background: #059669; }
+
+    .btn-outline {
+      background: transparent;
       color: #94a3b8;
       border: 1px solid #475569;
     }
-    .btn-clear:hover {
-      background-color: #334155;
-      color: #f1f5f9;
+    .btn-outline:hover {
+      background: #334155;
+      color: #ffffff;
     }
-    .items-count-badge {
-      font-size: 13px;
+
+    .counter-text {
+      display: inline-block;
       color: #38bdf8;
-      font-weight: 600;
-      margin-left: auto;
-    }
-    .log-box {
-      margin-top: 22px;
-      background-color: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      padding: 16px;
-      min-height: 140px;
-      max-height: 280px;
-      overflow-y: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       font-size: 13px;
+      font-weight: 600;
+      margin-left: 10px;
+      vertical-align: middle;
     }
-    .log-line {
-      margin-bottom: 6px;
+
+    #consoleBox {
+      margin-top: 20px;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 14px;
+      height: 160px;
+      overflow-y: scroll;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      box-sizing: border-box;
+    }
+
+    .log-row {
       color: #94a3b8;
-      word-break
+      word-break: break-all;
+    }
+    .log-success { color: #34d399; }
+    .log-error { color: #f87171; }
+    .log-accent { color: #38bdf8; }
+  </style>
+</head>
+<body>
+
+  <div class="main-wrapper">
+    <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
+    <div class="header-desc">可直接貼上 30+ 條 Rockfish 官網商品網址，自動抓取顏色、尺碼與圖片並輸出 Shopify CSV。</div>
+
+    <div class="card-box">
+      <label class="field-label" for="urlInput">商品網址列表（一行一條）：</label>
+      <textarea id="urlInput" placeholder="請在此貼上連結，支援一次貼多條：&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-beige/4282/category/230/display/1/&#10;https://en.rockfish-weatherwear.co.kr/product/detail.html?product_no=3626"></textarea>
+
+      <div class="btn-bar">
+        <button type="button" class="btn-gray" onclick="confirmLinks()">✅ 確認加入清單</button>
+        <button type="button" id="startBtn" class="btn-blue" onclick="processAll()">🚀 開始抓取商品</button>
+        <button type="button" id="exportBtn" class="btn-green" onclick="exportShopifyCSV()">📥 下載
