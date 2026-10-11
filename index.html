@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>通用電商 to Shopify 轉換工具</title>
+  <title>通用品牌 to Shopify 轉換工具</title>
   <style>
     html, body {
       background: #0f172a !important;
@@ -127,7 +127,7 @@
 
   <div class="main-wrapper">
     <div class="header-title">🛍️ 通用品牌 to Shopify 轉換工具</div>
-    <div class="header-desc">支援 Rockfish、Mardi Mercredi 及其他韓國品牌：智慧識別 Vendor、過濾韓文與品牌尾綴、自動合併同款顏色並匯出 CSV。</div>
+    <div class="header-desc">精準過濾選單海報與 Logo 雜圖，完美鎖定商品真身大圖與 Model 相片，並自動匹配各色 Variant。</div>
 
     <div class="card-box">
       <label class="field-label" for="urlInput">商品網址列表（貼上自動跳下一行，支援多條連續貼入）：</label>
@@ -225,7 +225,6 @@
       return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
     }
 
-    // 智能識別 Vendor 品牌名稱
     function detectVendor(url, doc) {
       var host = '';
       try {
@@ -238,36 +237,32 @@
       if (host.indexOf('matinkim') !== -1) return 'Matin Kim';
       if (host.indexOf('standoil') !== -1) return 'Stand Oil';
 
-      // 從 og:site_name 提取
       var siteMeta = doc.querySelector('meta[property="og:site_name"]');
       if (siteMeta && siteMeta.getAttribute('content')) {
         return siteMeta.getAttribute('content').split(/[-|]/)[0].trim();
       }
 
-      // 從網域名稱自動轉換 (如 brandname.com -> Brandname)
       var cleanHost = host.replace(/^www\./, '').replace(/\.(com|co\.kr|kr|net|org)$/, '');
       return cleanHost.charAt(0).toUpperCase() + cleanHost.slice(1);
     }
 
-    // 智能清洗標題、去除品牌名及韓文尾綴、提取顏色
     function parseUniversalTitleAndColor(rawTitle, productUrl) {
       var t = rawTitle.replace(/Product Name\s*:/i, '').trim();
       t = t.replace(/^\[.*?\]\s*/i, '').trim();
 
-      // 1. 去除尾部的品牌名與韓文字 (例如 - MARDI MERCREDI | 마르디 메크르디)
+      // 去除品牌名與韓文字
       t = t.replace(/\s*[-–|]\s*(MARDI MERCREDI|ROCKFISH|WEATHERWEAR|마르디|메크르디).*$/i, '').trim();
       t = t.replace(/\s*\|.*$/, '').trim();
 
       var color = '';
 
-      // 2. 從標題後方提取底線或橫線顏色 (例如 CHECK_BLUE 或 - BLUE)
+      // 提取標題底線或橫線顏色
       var colorMatch = t.match(/[\s_-]+(BLUE|PINK|MINT|BEIGE|BROWN|BLACK|WHITE|SILVER|NAVY|GRAY|GREY|RED|GREEN|IVORY|CREAM|KHAKI|CAMEL|YELLOW|PURPLE|CHARCOAL|GOLD|ORANGE|OATMEAL)$/i);
       if (colorMatch) {
         color = colorMatch[1].trim();
         t = t.substring(0, colorMatch.index).trim();
       }
 
-      // 3. 若標題未標示顏色，從 URL slug 智慧提取
       if (!color) {
         var lowUrl = productUrl.toLowerCase();
         var commonColors = ['blue', 'pink', 'mint', 'beige', 'brown', 'black', 'white', 'silver', 'navy', 'gray', 'grey', 'red', 'green', 'ivory', 'cream', 'khaki', 'camel', 'yellow', 'purple', 'charcoal', 'gold', 'orange', 'oatmeal'];
@@ -287,9 +282,7 @@
         color = 'Default Color';
       }
 
-      // 去除結尾多餘底線或破折號
       t = t.replace(/[\s_-]+$/, '').trim();
-
       return { cleanTitle: t, color: color };
     }
 
@@ -367,10 +360,8 @@
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, 'text/html');
 
-      // 1. Vendor
       var vendor = detectVendor(productUrl, doc);
 
-      // 2. 標題與顏色
       var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name');
       var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
       if (!rawTitle && doc.title) rawTitle = doc.title;
@@ -379,10 +370,8 @@
       var title = info.cleanTitle;
       var currentColor = info.color;
 
-      // 3. 描述
       var cleanDesc = parseCleanDescription(doc);
 
-      // 4. 價格
       var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
       var price = '0.00';
       if (priceTag) {
@@ -391,23 +380,25 @@
         if (match) price = match[0].replace(/,/g, '');
       }
 
-      // 5. 圖片提取
       var uri = new URL(productUrl);
       var root = uri.origin;
       var keyProductImg = '';
       var cleanModelImgs = [];
 
-      var mainImgEl = doc.querySelector('meta[property="og:image"], .keyImg img, .thumbnail img');
+      // 主圖定位：優先找商品主大圖
+      var mainImgEl = doc.querySelector('.keyImg img, .thumbnail img, #main-image img');
       if (mainImgEl) {
-        var mSrc = mainImgEl.getAttribute('content') || mainImgEl.getAttribute('src') || mainImgEl.getAttribute('ec-data-src') || '';
+        var mSrc = mainImgEl.getAttribute('src') || mainImgEl.getAttribute('ec-data-src') || '';
         if (mSrc.indexOf('//') === 0) mSrc = 'https:' + mSrc;
         else if (mSrc.indexOf('/') === 0) mSrc = root + mSrc;
+        if (mSrc.indexOf('http://') === 0) mSrc = mSrc.replace('http://', 'https://');
         keyProductImg = mSrc;
       }
 
-      var allImgNodes = doc.querySelectorAll('img');
-      for (var i = 0; i < allImgNodes.length; i++) {
-        var node = allImgNodes[i];
+      // 嚴格限定：只在商品詳情容器內抓取（#prdDetail, .detail_view, .product-detail），絕不抓取全站導航海報！
+      var detailNodes = doc.querySelectorAll('#prdDetail img, .detail_view img, .cont img, .product-detail img, .detail-image img');
+      for (var i = 0; i < detailNodes.length; i++) {
+        var node = detailNodes[i];
         var src = node.getAttribute('ec-data-src') || 
                   node.getAttribute('data-original') || 
                   node.getAttribute('data-src') || 
@@ -420,23 +411,30 @@
         if (src) {
           if (src.indexOf('//') === 0) src = 'https:' + src;
           else if (src.indexOf('/') === 0) src = root + src;
+          if (src.indexOf('http://') === 0) src = src.replace('http://', 'https://');
 
           var low = src.toLowerCase();
 
-          var isJunk = low.indexOf('naver') !== -1 ||
+          // 核心過濾黑名單：徹底封殺全站導航、促銷海報、Logo
+          var isJunk = low.indexOf('meta_logo') !== -1 ||
+                       low.indexOf('promotion') !== -1 ||
+                       low.indexOf('submenu') !== -1 ||
+                       low.indexOf('collection_sub') !== -1 ||
+                       low.indexOf('banner') !== -1 ||
+                       low.indexOf('menu') !== -1 ||
+                       low.indexOf('naver') !== -1 ||
                        low.indexOf('pay') !== -1 ||
                        low.indexOf('/small/') !== -1 ||
-                       low.indexOf('/medium/') !== -1 ||
                        low.indexOf('icon') !== -1 ||
                        low.indexOf('btn') !== -1 ||
                        low.indexOf('blank') !== -1 ||
                        low.indexOf('echosting') !== -1 ||
-                       low.indexOf('common') !== -1 ||
                        low.indexOf('logo') !== -1 ||
                        low.indexOf('.gif') !== -1;
 
           if (!isJunk) {
-            if (low.indexOf('/big/') !== -1 || low.indexOf('nneditor') !== -1 || low.indexOf('upload') !== -1 || low.indexOf('cafe24.com') !== -1) {
+            // 只保留商品真身大圖：NNEditor 內文圖、/big/ 大圖、cafe24 商品大圖
+            if (low.indexOf('nneditor') !== -1 || low.indexOf('/big/') !== -1 || low.indexOf('/product/') !== -1) {
               if (!keyProductImg) keyProductImg = src;
               if (cleanModelImgs.indexOf(src) === -1 && src !== keyProductImg) {
                 cleanModelImgs.push(src);
@@ -446,7 +444,11 @@
         }
       }
 
-      // 6. 尺碼判定
+      // 如果 keyProductImg 依然抓到 logo 或為空，用第一張 Model 相作主圖
+      if ((!keyProductImg || keyProductImg.indexOf('logo') !== -1) && cleanModelImgs.length > 0) {
+        keyProductImg = cleanModelImgs.shift();
+      }
+
       var sizes = [];
       var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(title) || /category\/230|shoes/i.test(productUrl);
 
@@ -531,6 +533,7 @@
               productGroups[item.handle].description = item.description;
             }
 
+            // 綁定該顏色專屬圖（如 WOOL20CHECK20MUFFLER_PINK.jpg）
             if (item.keyImage) {
               productGroups[item.handle].colorImages[item.color] = item.keyImage;
               if (productGroups[item.handle].productImages.indexOf(item.keyImage) === -1) {
@@ -658,7 +661,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！已自動精準識別 Vendor 並純化標題，正在下載 CSV...', 'ok');
+        printLog('🎉 全部處理完成！全站海報與雜圖已徹底清除，正確商品相片已就緒，正在下載 CSV...', 'ok');
         downloadCsvFile();
       } else {
         printLog('未獲得任何資料。', 'err');
