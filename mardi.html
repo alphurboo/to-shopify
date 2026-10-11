@@ -6,12 +6,9 @@
   <title>Mardi Mercredi to Shopify 轉換器</title>
   <style>
     html, body {
-      background: #0f172a !important;
-      color: #f8fafc !important;
+      background: #0f172a !important; color: #f8fafc !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0;
-      padding: 0;
-      min-height: 100%;
+      margin: 0; padding: 0; min-height: 100%;
     }
     .main-wrapper { max-width: 860px; margin: 40px auto; padding: 0 20px; display: block; }
     .header-title { color: #38bdf8; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
@@ -42,13 +39,17 @@
     .log-error { color: #f87171; }
     .log-accent { color: #38bdf8; }
   </style>
+
+  <!-- 必須正確載入模組 -->
+  <script src="engines/registry.js"></script>
+  <script src="engines/mardi.js"></script>
 </head>
 <body>
 
   <div class="main-wrapper">
     <div style="margin-bottom:12px;"><a href="index.html" style="color:#94a3b8;text-decoration:none;">← 返回導航大廳</a></div>
     <div class="header-title">🌸 Mardi Mercredi 專屬轉換器</div>
-    <div class="header-desc">已修正長條圖問題：優先抓取正方形平鋪主圖作為 Variant Image，封殺全站海報 Logo，自動剔除韓文與品牌尾綴。</div>
+    <div class="header-desc">優先抓取正方形平鋪主圖作為 Variant Image，過濾全站海報 Logo，自動合併同款顏色並匯出 Draft CSV。</div>
 
     <div class="card-box">
       <label class="field-label" for="urlInput">Mardi Mercredi 商品網址列表（貼上自動跳下一行）：</label>
@@ -61,14 +62,13 @@
       </div>
 
       <div id="consoleBox">
-        <div class="log-row">系統就緒，貼上 Mardi 網址後點擊按鈕。</div>
+        <div class="log-row">系統就緒。</div>
       </div>
     </div>
   </div>
 
   <script>
     var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
-    var finalData = [];
     var textarea = document.getElementById('urlInput');
 
     textarea.addEventListener('paste', function(e) {
@@ -124,48 +124,8 @@
 
     function resetForm() {
       textarea.value = '';
-      finalData = [];
       updateCount();
       printLog('已清空所有內容。', 'info');
-    }
-
-    function sanitizeHandle(str) {
-      return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
-    }
-
-    function parseMardiTitleAndColor(rawTitle, productUrl) {
-      var t = rawTitle.replace(/Product Name\s*:/i, '').trim();
-      t = t.replace(/^\[.*?\]\s*/i, '').trim();
-
-      // 去除 - MARDI MERCREDI | 마르디 메크르디
-      t = t.replace(/\s*[-–|]\s*(MARDI MERCREDI|마르디|메크르디).*$/i, '').trim();
-      t = t.replace(/\s*\|.*$/, '').trim();
-
-      var color = '';
-      var colorMatch = t.match(/[\s_-]+(BLUE|PINK|MINT|BEIGE|BROWN|BLACK|WHITE|SILVER|NAVY|GRAY|GREY|RED|GREEN|IVORY|CREAM|KHAKI|CAMEL|YELLOW|PURPLE|CHARCOAL|GOLD|ORANGE|OATMEAL)$/i);
-      if (colorMatch) {
-        color = colorMatch[1].trim();
-        t = t.substring(0, colorMatch.index).trim();
-      }
-
-      if (!color) {
-        var lowUrl = productUrl.toLowerCase();
-        var commonColors = ['blue', 'pink', 'mint', 'beige', 'brown', 'black', 'white', 'silver', 'navy', 'gray', 'grey', 'red', 'green', 'ivory', 'cream', 'khaki', 'camel', 'yellow', 'purple', 'charcoal', 'gold', 'orange', 'oatmeal'];
-        for (var c = 0; c < commonColors.length; c++) {
-          var testColor = commonColors[c];
-          var reg = new RegExp('[-_/]' + testColor + '([-_/]|$)', 'i');
-          if (reg.test(lowUrl)) {
-            color = testColor;
-            break;
-          }
-        }
-      }
-
-      if (color) color = color.charAt(0).toUpperCase() + color.slice(1).toLowerCase();
-      else color = 'Default Color';
-
-      t = t.replace(/[\s_-]+$/, '').trim();
-      return { cleanTitle: t, color: color };
     }
 
     async function loadHtml(url) {
@@ -192,96 +152,6 @@
       throw new Error('無法存取該頁面');
     }
 
-    function extractMardi(html, productUrl) {
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
-
-      var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name');
-      var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
-      if (!rawTitle && doc.title) rawTitle = doc.title;
-
-      var info = parseMardiTitleAndColor(rawTitle, productUrl);
-      var title = info.cleanTitle;
-      var currentColor = info.color;
-
-      var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
-      var price = '0.00';
-      if (priceTag) {
-        var pText = priceTag.getAttribute('content') || priceTag.innerText || '';
-        var match = pText.match(/[\d,.]+/);
-        if (match) price = match[0].replace(/,/g, '');
-      }
-
-      var uri = new URL(productUrl);
-      var root = uri.origin;
-
-      var squareMainImg = ''; // 正方形平鋪商品主圖
-      var detailImages = [];  // 其他細節相與 Model 相
-      var longScrollImgs = []; // 長條圖（排在最後）
-
-      // 1. 抓取正方形平鋪商品主圖 (Cafe24 的 /product/big/ 通常為正方形平鋪商品圖)
-      var thumbEls = doc.querySelectorAll('.keyImg img, .thumbnail img, #main-image img');
-      for (var t = 0; t < thumbEls.length; t++) {
-        var tSrc = thumbEls[t].getAttribute('src') || thumbEls[t].getAttribute('ec-data-src') || '';
-        if (tSrc) {
-          if (tSrc.indexOf('//') === 0) tSrc = 'https:' + tSrc;
-          else if (tSrc.indexOf('/') === 0) tSrc = root + tSrc;
-          if (tSrc.indexOf('http://') === 0) tSrc = tSrc.replace('http://', 'https://');
-
-          if (tSrc.toLowerCase().indexOf('meta_logo') === -1 && tSrc.toLowerCase().indexOf('/small/') === -1) {
-            squareMainImg = tSrc;
-            break;
-          }
-        }
-      }
-
-      // 2. 抓取內文商品大圖（NNEditor）
-      var editorImgs = doc.querySelectorAll('#prdDetail img, .detail_view img, div[class*="editor"] img');
-      for (var i = 0; i < editorImgs.length; i++) {
-        var src = editorImgs[i].getAttribute('src') || editorImgs[i].getAttribute('ec-data-src') || '';
-        if (src) {
-          if (src.indexOf('//') === 0) src = 'https:' + src;
-          else if (src.indexOf('/') === 0) src = root + src;
-          if (src.indexOf('http://') === 0) src = src.replace('http://', 'https://');
-
-          var low = src.toLowerCase();
-          var isJunk = low.indexOf('meta_logo') !== -1 || low.indexOf('promotion') !== -1 ||
-                       low.indexOf('submenu') !== -1 || low.indexOf('collection_sub') !== -1 ||
-                       low.indexOf('banner') !== -1 || low.indexOf('naver') !== -1 || low.indexOf('pay') !== -1;
-
-          if (!isJunk && (low.indexOf('nneditor') !== -1 || low.indexOf('/upload/') !== -1 || low.indexOf('/big/') !== -1)) {
-            // 判斷是否為長條排版圖 (含有 MUFFLER_ 或 CHECK_ 的整張圖)
-            if (low.indexOf('muffler_') !== -1 || low.indexOf('check_') !== -1) {
-              if (longScrollImgs.indexOf(src) === -1) longScrollImgs.push(src);
-            } else {
-              if (detailImages.indexOf(src) === -1) detailImages.push(src);
-            }
-          }
-        }
-      }
-
-      // 如果未找到正方形主圖，才以長條圖暫代
-      if (!squareMainImg && longScrollImgs.length > 0) {
-        squareMainImg = longScrollImgs[0];
-      }
-
-      // 組合相片清單：正方形商品圖在最前 ➔ 細節/Model 照 ➔ 長條全景圖排在最後
-      var allSortedImgs = [];
-      if (squareMainImg) allSortedImgs.push(squareMainImg);
-      allSortedImgs = allSortedImgs.concat(detailImages).concat(longScrollImgs);
-
-      return {
-        vendor: 'Mardi Mercredi',
-        title: title,
-        handle: sanitizeHandle(title),
-        price: price,
-        keyImage: squareMainImg,
-        images: allSortedImgs,
-        color: currentColor,
-        sourceUrl: productUrl
-      };
-    }
-
     async function processAllParallel() {
       var queue = getValidUrls();
       if (queue.length === 0) {
@@ -289,11 +159,18 @@
         return;
       }
 
+      // 檢查 Engine 是否正確載入
+      var engines = window.REGISTERED_ENGINES || [];
+      var engine = engines.find(function(e) { return e.id === 'mardi'; });
+      if (!engine) {
+        alert('錯誤：Mardi Engine 未能成功載入，請確認 engines/mardi.js 是否存在！');
+        return;
+      }
+
       var btn = document.getElementById('startBtn');
       btn.disabled = true;
-      finalData = [];
 
-      printLog('🚀 啟動 Mardi Mercredi 引擎，正在抓取 ' + queue.length + ' 個商品...', 'info');
+      printLog('🚀 啟動 Mardi Mercredi 引擎，正在處理 ' + queue.length + ' 個商品...', 'info');
 
       var productGroups = {};
       var concurrency = 5;
@@ -303,18 +180,20 @@
         while (currentIndex < queue.length) {
           var idx = currentIndex++;
           var u = queue[idx];
-          printLog('正在讀取 (' + (idx + 1) + '/' + queue.length + '): ' + u);
+          printLog('讀取 (' + (idx + 1) + '/' + queue.length + '): ' + u);
 
           try {
             var raw = await loadHtml(u);
-            var item = extractMardi(raw, u);
-            printLog('✓ 完成: [' + item.vendor + '] ' + item.title + ' [' + item.color + '] (相片:' + item.images.length + '張)', 'ok');
+            var item = engine.parse(raw, u);
+            var handle = window.ENGINE_UTILS.sanitizeHandle(item.title);
+            printLog('✓ 完成: ' + item.title + ' [' + item.color + ']', 'ok');
 
-            if (!productGroups[item.handle]) {
-              productGroups[item.handle] = {
-                vendor: item.vendor,
-                handle: item.handle,
+            if (!productGroups[handle]) {
+              productGroups[handle] = {
+                handle: handle,
                 title: item.title,
+                vendor: item.vendor,
+                type: item.type,
                 price: item.price,
                 sourceUrls: [],
                 colorImages: {},
@@ -323,47 +202,43 @@
               };
             }
 
-            if (productGroups[item.handle].sourceUrls.indexOf(item.sourceUrl) === -1) {
-              productGroups[item.handle].sourceUrls.push(item.sourceUrl);
+            if (productGroups[handle].sourceUrls.indexOf(u) === -1) {
+              productGroups[handle].sourceUrls.push(u);
             }
 
-            // 綁定正方形平鋪商品圖至 Variant Image
             if (item.keyImage) {
-              productGroups[item.handle].colorImages[item.color] = item.keyImage;
+              productGroups[handle].colorImages[item.color] = item.keyImage;
             }
 
-            // 匯總相片（優先收錄正方形主圖）
             for (var im = 0; im < item.images.length; im++) {
-              if (productGroups[item.handle].allImages.indexOf(item.images[im]) === -1) {
-                productGroups[item.handle].allImages.push(item.images[im]);
+              if (productGroups[handle].allImages.indexOf(item.images[im]) === -1) {
+                productGroups[handle].allImages.push(item.images[im]);
               }
             }
 
-            // Mardi 圍巾多為單一均碼，只建立顏色 Variant
-            var exists = false;
-            for (var vIdx = 0; vIdx < productGroups[item.handle].variants.length; vIdx++) {
-              if (productGroups[item.handle].variants[vIdx].color === item.color) {
-                exists = true; break;
+            var existsColor = false;
+            for (var cIdx = 0; cIdx < productGroups[handle].variants.length; cIdx++) {
+              if (productGroups[handle].variants[cIdx].color === item.color) {
+                existsColor = true; break;
               }
             }
-            if (!exists) {
-              productGroups[item.handle].variants.push({
+            if (!existsColor) {
+              productGroups[handle].variants.push({
                 color: item.color,
                 price: item.price
               });
             }
           } catch (err) {
-            printLog('✗ 失敗 (' + (idx + 1) + '): ' + err.message, 'err');
+            printLog('✗ 失敗: ' + err.message, 'err');
           }
         }
       }
 
       var pool = [];
-      for (var i = 0; i < Math.min(concurrency, queue.length); i++) {
-        pool.push(worker());
-      }
+      for (var i = 0; i < Math.min(concurrency, queue.length); i++) pool.push(worker());
       await Promise.all(pool);
 
+      var finalData = [];
       var groupKeys = Object.keys(productGroups);
       for (var g = 0; g < groupKeys.length; g++) {
         var grp = productGroups[groupKeys[g]];
@@ -380,12 +255,12 @@
             variantImg = grp.colorImages[v.color];
           }
 
-          var row = {
+          finalData.push({
             "Handle": grp.handle,
             "Title": isFirstRow ? grp.title : '',
             "Body (HTML)": "",
             "Vendor": isFirstRow ? grp.vendor : '',
-            "Type": isFirstRow ? 'Accessories' : '',
+            "Type": isFirstRow ? grp.type : '',
             "Tags": isFirstRow ? 'Korea, Fashion, Mardi Mercredi' : '',
             "Published": "FALSE",
             "Option1 Name": "Color",
@@ -400,29 +275,27 @@
             "Image Src": img,
             "Image Position": img ? (r + 1) : '',
             "Variant Image": variantImg,
-            "Internal Note (product.metafields.custom.internal_note)": isFirstRow ? sourceNote : '';
-            "Status": isFirstRow ? 'draft' : '';
-          };
-
-          finalData.push(row);
+            "Internal Note (product.metafields.custom.internal_note)": isFirstRow ? sourceNote : '',
+            "Status": isFirstRow ? 'draft' : ''
+          });
         }
       }
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 Mardi Mercredi 處理完畢，正在自動下載 CSV...', 'ok');
-        downloadCsv('mardi_shopify_' + Date.now() + '.csv');
+        printLog('🎉 處理完畢！正在自動下載 Shopify CSV...', 'ok');
+        downloadCsv(finalData, 'mardi_shopify_' + Date.now() + '.csv');
       } else {
         printLog('未獲得任何資料。', 'err');
       }
     }
 
-    function downloadCsv(filename) {
-      if (finalData.length === 0) return;
-      var keys = Object.keys(finalData[0]);
+    function downloadCsv(data, filename) {
+      if (!data || data.length === 0) return;
+      var keys = Object.keys(data[0]);
       var csv = '\uFEFF' + keys.map(function(k) { return '"' + k + '"'; }).join(',') + '\n';
-      for (var i = 0; i < finalData.length; i++) {
-        var row = finalData[i];
+      for (var i = 0; i < data.length; i++) {
+        var row = data[i];
         var line = keys.map(function(k) {
           var val = row[k] !== undefined ? String(row[k]) : '';
           return '"' + val.replace(/"/g, '""') + '"';
