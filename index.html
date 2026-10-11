@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>通用電商 to Shopify 轉換工具</title>
+  <title>Rockfish to Shopify 轉換工具</title>
   <style>
     html, body {
       background: #0f172a !important;
@@ -51,10 +51,31 @@
       margin-bottom: 8px;
     }
 
+    #customDesc {
+      display: block;
+      width: 100%;
+      height: 90px;
+      background: #020617;
+      color: #94a3b8;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 13px;
+      box-sizing: border-box;
+      outline: none;
+      resize: vertical;
+      margin-bottom: 18px;
+    }
+
+    #customDesc:focus {
+      border-color: #38bdf8;
+      color: #ffffff;
+    }
+
     #urlInput {
       display: block;
       width: 100%;
-      height: 180px;
+      height: 160px;
       background: #020617;
       color: #ffffff;
       border: 1px solid #475569;
@@ -131,10 +152,13 @@
 <body>
 
   <div class="main-wrapper">
-    <div class="header-title">🛍️ 通用電商 to Shopify 轉換工具</div>
-    <div class="header-desc">深度支援 Cafe24 / 韓國官網 Lazyload 相片抓取、精準提取商品 Description、自動識別尺碼並綁定 Variant。</div>
+    <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
+    <div class="header-desc">已過濾所有 Naver/Npay/小縮圖雜圖，鞋款智慧配對 230-255 尺碼（手袋不加 Size），相片按顏色分組。</div>
 
     <div class="card-box">
+      <label class="field-label" for="customDesc">自訂 Description（可選，若官網 Description 為韓文或想統一行銷文案可填寫於此）：</label>
+      <textarea id="customDesc" placeholder="選填：若留空則自動提取官網原文或生成精美規格描述。例如貼入：&#10;These are Mary Jane ballet flats characterized by the natural texture of genuine leather...&#10;- Square toe shape&#10;- Genuine leather"></textarea>
+
       <label class="field-label" for="urlInput">商品網址列表（一行一條，鞋履、手袋皆可）：</label>
       <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-beige/4282/category/230/display/1/"></textarea>
 
@@ -197,6 +221,7 @@
 
     function resetForm() {
       document.getElementById('urlInput').value = '';
+      document.getElementById('customDesc').value = '';
       queue = [];
       finalData = [];
       document.getElementById('urlCount').innerText = '待處理：0 個商品';
@@ -241,52 +266,63 @@
       return { cleanTitle: t, color: color };
     }
 
-    // 深度精準提取 DESCRIPTION（穿透 Cafe24 結構）
-    function parseCleanDescription(doc) {
+    function parseCleanDescription(doc, cleanTitle) {
+      // 1. 若使用者有手動在文字框輸入自訂 Description
+      var manual = document.getElementById('customDesc').value.trim();
+      if (manual) {
+        return manual.split('\n').map(function(l){ return l.trim(); }).filter(Boolean).join('\n');
+      }
+
+      // 2. 從網頁內文節點抓取
+      var rawText = '';
       var candidates = [
         '#prdDetail .content_description',
         '.content_description',
         '#prdDetail .cont',
-        '#prdDetail',
         '.edibot-product-desc',
-        '.product-description',
+        '#prdDetail',
         '[itemprop="description"]'
       ];
 
-      var rawText = '';
       for (var i = 0; i < candidates.length; i++) {
         var el = doc.querySelector(candidates[i]);
-        if (el && el.innerText && el.innerText.trim().length > 25) {
+        if (el && el.innerText && el.innerText.trim().length > 30) {
           rawText = el.innerText;
           break;
         }
       }
 
-      if (!rawText) return '';
+      if (rawText) {
+        var lines = rawText.split('\n');
+        var validLines = [];
+        var stopWords = ['FABRIC & CARE', 'SHIPPING', 'DELIVERY', 'NOTICE', 'RETURN & EXCHANGE', 'SIZE GUIDE', 'REVIEW', 'Q&A'];
 
-      var lines = rawText.split('\n');
-      var validLines = [];
-      var stopWords = ['FABRIC & CARE', 'SHIPPING', 'DELIVERY', 'NOTICE', 'RETURN & EXCHANGE', 'SIZE GUIDE', 'REVIEW', 'Q&A'];
+        for (var j = 0; j < lines.length; j++) {
+          var line = lines[j].trim();
+          if (!line) continue;
 
-      for (var j = 0; j < lines.length; j++) {
-        var line = lines[j].trim();
-        if (!line) continue;
+          var isStop = false;
+          for (var s = 0; s < stopWords.length; s++) {
+            if (line.toUpperCase() === stopWords[s]) { isStop = true; break; }
+          }
+          if (isStop && validLines.length > 1) break;
+          if (line.toUpperCase() === 'DESCRIPTION') continue;
 
-        var isStop = false;
-        for (var s = 0; s < stopWords.length; s++) {
-          if (line.toUpperCase() === stopWords[s]) { isStop = true; break; }
+          line = line.replace(/\s+/g, ' ');
+          if (validLines.indexOf(line) === -1) {
+            validLines.push(line);
+          }
         }
-        if (isStop && validLines.length > 1) break;
-
-        if (line.toUpperCase() === 'DESCRIPTION') continue;
-
-        line = line.replace(/\s+/g, ' ');
-        if (validLines.indexOf(line) === -1) {
-          validLines.push(line);
+        if (validLines.length > 0) {
+          return validLines.join('\n');
         }
       }
 
-      return validLines.join('\n');
+      // 3. 自動精準生成的英文產品描述
+      return cleanTitle + ' - Authentic Rockfish Weatherwear imported from Korea.\n' +
+             'Features a comfortable fit, premium craftsmanship, and elegant signature detailing.\n' +
+             '- Imported directly from Korea\n' +
+             '- High quality materials & finish';
     }
 
     async function loadHtml(url) {
@@ -314,17 +350,13 @@
       throw new Error('無法存取該頁面');
     }
 
-    // 核心提取函數（解決 Lazyload 圖片丟失、解決尺碼遺失）
     function extractUniversalProduct(html, productUrl) {
       var parser = new DOMParser();
       var doc = parser.parseFromString(html, 'text/html');
 
-      // 1. 標題
-      var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .product_name, .name');
-      var rawTitle = '';
-      if (titleTag) {
-        rawTitle = titleTag.getAttribute('content') || titleTag.innerText || '';
-      }
+      // 1. 標題與顏色
+      var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .product-title, .name');
+      var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
       if (!rawTitle && doc.title) rawTitle = doc.title.split(/[-–|]/)[0].trim();
 
       var info = parseUniversalTitleAndColor(rawTitle, productUrl);
@@ -332,10 +364,7 @@
       var currentColor = info.color;
 
       // 2. 描述
-      var cleanDesc = parseCleanDescription(doc);
-      if (!cleanDesc) {
-        cleanDesc = title + ' - Authentic imported goods.';
-      }
+      var cleanDesc = parseCleanDescription(doc, title);
 
       // 3. 價格
       var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
@@ -346,85 +375,71 @@
         if (match) price = match[0].replace(/,/g, '');
       }
 
-      // 4. 突破 Cafe24 Lazyload 抓全圖（包括 Model 相片）
+      // 4. 嚴格過濾雜圖（剔除 Naver/Npay/小縮圖），只取高清大圖與模特圖
       var uri = new URL(productUrl);
       var root = uri.origin;
       var keyProductImg = '';
-      var allImages = [];
+      var cleanModelImgs = [];
 
-      var mainImgEl = doc.querySelector('meta[property="og:image"], .keyImg img, .thumbnail img, .main-image img');
+      var mainImgEl = doc.querySelector('meta[property="og:image"], .keyImg img, .thumbnail img');
       if (mainImgEl) {
         var mSrc = mainImgEl.getAttribute('content') || mainImgEl.getAttribute('src') || mainImgEl.getAttribute('ec-data-src') || '';
         if (mSrc.indexOf('//') === 0) mSrc = 'https:' + mSrc;
         else if (mSrc.indexOf('/') === 0) mSrc = root + mSrc;
         keyProductImg = mSrc;
-        if (keyProductImg && allImages.indexOf(keyProductImg) === -1) allImages.push(keyProductImg);
       }
 
-      // 掃描頁面所有圖片，優先讀取 ec-data-src / data-original (Model相所在處)
-      var imgNodes = doc.querySelectorAll('#prdDetail img, .detail_view img, .cont img, .product-detail img, div img');
-      for (var i = 0; i < imgNodes.length; i++) {
-        var node = imgNodes[i];
-        var src = node.getAttribute('ec-data-src') || 
-                  node.getAttribute('data-original') || 
-                  node.getAttribute('data-lazy') || 
-                  node.getAttribute('data-src') || 
-                  node.getAttribute('src') || '';
-
+      var allImgNodes = doc.querySelectorAll('#prdDetail img, .detail_view img, .cont img');
+      for (var i = 0; i < allImgNodes.length; i++) {
+        var node = allImgNodes[i];
+        var src = node.getAttribute('ec-data-src') || node.getAttribute('data-original') || node.getAttribute('data-src') || node.getAttribute('src') || '';
         if (src) {
           if (src.indexOf('//') === 0) src = 'https:' + src;
           else if (src.indexOf('/') === 0) src = root + src;
 
           var low = src.toLowerCase();
-          // 過濾無效 icon、佔位圖與 logo
-          if (low.indexOf('icon') === -1 && low.indexOf('btn') === -1 && low.indexOf('common') === -1 && 
-              low.indexOf('blank.gif') === -1 && low.indexOf('banner') === -1 && low.indexOf('logo') === -1) {
+
+          // 核心過濾清單：清除 naver, npay, 小縮圖, 按鈕圖, 佔位圖
+          var isJunk = low.indexOf('naver') !== -1 ||
+                       low.indexOf('pay') !== -1 ||
+                       low.indexOf('small') !== -1 ||
+                       low.indexOf('medium') !== -1 ||
+                       low.indexOf('icon') !== -1 ||
+                       low.indexOf('btn') !== -1 ||
+                       low.indexOf('blank') !== -1 ||
+                       low.indexOf('echosting') !== -1 ||
+                       low.indexOf('common') !== -1 ||
+                       low.indexOf('logo') !== -1 ||
+                       low.indexOf('.gif') !== -1;
+
+          if (!isJunk) {
             if (!keyProductImg) keyProductImg = src;
-            if (allImages.indexOf(src) === -1) {
-              allImages.push(src);
+            if (cleanModelImgs.indexOf(src) === -1 && src !== keyProductImg) {
+              cleanModelImgs.push(src);
             }
           }
         }
       }
 
-      // 5. 精準抓取尺碼（兼顧下拉選單與按鈕）
+      // 5. 智慧尺碼判斷：鞋款自動補齊標準鞋碼，手袋配件不加尺碼
       var sizes = [];
+      var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(title) || /category\/230|shoes/i.test(productUrl);
 
-      // 優先方式 A: 下拉選單 option
-      var selects = doc.querySelectorAll('select[id*="product_option_id"], select[id*="option"], select.ProductOption0');
-      for (var s = 0; s < selects.length; s++) {
-        var sel = selects[s];
-        var tr = sel.closest('tr');
-        var thText = tr && tr.querySelector('th') ? tr.querySelector('th').innerText.toLowerCase() : '';
-
-        // 只要標籤含 size，或 option 內容為鞋碼數字
-        var optElems = sel.querySelectorAll('option');
-        for (var o = 0; o < optElems.length; o++) {
-          var optText = optElems[o].innerText.trim();
-          if (optText && optText.indexOf('*') !== 0 && optText.toLowerCase().indexOf('choose') === -1 && optText.toLowerCase().indexOf('선택') === -1) {
-            optText = optText.replace(/\[.*?(sold out|품절).*?\]/gi, '').trim();
-            // 判斷是否為尺碼格式
-            if (/^(220|225|230|235|240|245|250|255|260|265|270|XS|S|M|L|XL|FREE)$/i.test(optText) || thText.indexOf('size') !== -1 || thText.indexOf('사이즈') !== -1) {
-              if (sizes.indexOf(optText) === -1) sizes.push(optText);
-            }
+      // 先嘗試從動態 script 或選單中解析
+      var pageText = html;
+      var sizeMatch = pageText.match(/"option_value":\s*"(\d{3})"/g);
+      if (sizeMatch) {
+        for (var sm = 0; sm < sizeMatch.length; sm++) {
+          var val = sizeMatch[sm].replace(/[^0-9]/g, '');
+          if (sizes.indexOf(val) === -1 && parseInt(val) >= 220 && parseInt(val) <= 270) {
+            sizes.push(val);
           }
         }
       }
 
-      // 方式 B: 按鈕 / 列表格式
-      if (sizes.length === 0) {
-        var optionBlocks = doc.querySelectorAll('tr, .xans-product-option, div[class*="size"], ul[class*="size"], .ec-product-button');
-        for (var b = 0; b < optionBlocks.length; b++) {
-          var blockText = optionBlocks[b].innerText.toUpperCase();
-          if (blockText.indexOf('SIZE') !== -1) {
-            var matches = blockText.match(/\b(220|225|230|235|240|245|250|255|260|265|270)\b/g);
-            if (matches) {
-              for (var m = 0; m < matches.length; m++) {
-                if (sizes.indexOf(matches[m]) === -1) sizes.push(matches[m]);
-              }
-            }
-          }
-        }
+      // 若確認是鞋款且動態選單未能取到，自動套用標準韓版鞋碼
+      if (isShoe && sizes.length === 0) {
+        sizes = ['230', '235', '240', '245', '250', '255'];
       }
 
       return {
@@ -432,9 +447,9 @@
         handle: sanitizeHandle(title),
         price: price,
         keyImage: keyProductImg,
-        images: allImages,
+        modelImages: cleanModelImgs,
         color: currentColor,
-        sizes: sizes,
+        sizes: sizes, // 鞋款為 6 個尺碼，手袋為 []
         description: cleanDesc
       };
     }
@@ -449,7 +464,7 @@
       exp.style.display = 'none';
       finalData = [];
 
-      printLog('🚀 啟動深度解析引擎，並行抓取 ' + queue.length + ' 個商品中...', 'info');
+      printLog('🚀 啟動優化引擎，並行抓取 ' + queue.length + ' 個商品中...', 'info');
 
       var productGroups = {};
       var concurrency = 5;
@@ -465,7 +480,7 @@
             var raw = await loadHtml(u);
             var item = extractUniversalProduct(raw, u);
             var sizeMsg = item.sizes.length > 0 ? ('碼:' + item.sizes.join('/')) : '無尺碼規格';
-            printLog('✓ 完成 (' + (idx + 1) + '): ' + item.title + ' [' + item.color + '] (' + sizeMsg + ', 高清圖:' + item.images.length + '張)', 'ok');
+            printLog('✓ 完成 (' + (idx + 1) + '): ' + item.title + ' [' + item.color + '] (' + sizeMsg + ', 高清Model相:' + item.modelImages.length + '張)', 'ok');
 
             if (!productGroups[item.handle]) {
               productGroups[item.handle] = {
@@ -474,7 +489,8 @@
                 price: item.price,
                 description: item.description,
                 colorImages: {},
-                allImages: [],
+                productImages: [], // 收集各顏色的鞋款圖
+                modelImages: [],   // 收集模特穿搭圖（不多於 6 張精選）
                 variants: [],
                 hasSize: false
               };
@@ -484,18 +500,25 @@
               productGroups[item.handle].description = item.description;
             }
 
+            // 該顏色主圖
             if (item.keyImage) {
               productGroups[item.handle].colorImages[item.color] = item.keyImage;
-            }
-
-            // 合併所有大圖與 Model 相
-            for (var im = 0; im < item.images.length; im++) {
-              if (productGroups[item.handle].allImages.indexOf(item.images[im]) === -1) {
-                productGroups[item.handle].allImages.push(item.images[im]);
+              if (productGroups[item.handle].productImages.indexOf(item.keyImage) === -1) {
+                productGroups[item.handle].productImages.push(item.keyImage);
               }
             }
 
-            // 處理 Variant
+            // 精選模特大圖（最多收錄 6 張高畫質穿搭照，不再出現 100 多張雜圖）
+            for (var m = 0; m < item.modelImages.length; m++) {
+              var mPic = item.modelImages[m];
+              if (productGroups[item.handle].modelImages.length < 6) {
+                if (productGroups[item.handle].modelImages.indexOf(mPic) === -1 && productGroups[item.handle].productImages.indexOf(mPic) === -1) {
+                  productGroups[item.handle].modelImages.push(mPic);
+                }
+              }
+            }
+
+            // 變體配對
             if (item.sizes.length > 0) {
               productGroups[item.handle].hasSize = true;
               for (var s = 0; s < item.sizes.length; s++) {
@@ -545,13 +568,17 @@
       var groupKeys = Object.keys(productGroups);
       for (var g = 0; g < groupKeys.length; g++) {
         var grp = productGroups[groupKeys[g]];
-        var rowCount = Math.max(grp.variants.length, grp.allImages.length);
+
+        // 乾淨 Media 列表：各顏色主要商品圖（在前） + 精選 Model 相（在後）
+        var finalGallery = grp.productImages.concat(grp.modelImages);
+        var rowCount = Math.max(grp.variants.length, finalGallery.length);
 
         for (var r = 0; r < rowCount; r++) {
           var isFirstRow = (r === 0);
           var v = grp.variants[r] || null;
-          var img = grp.allImages[r] || '';
+          var img = finalGallery[r] || '';
 
+          // 綁定 Variant Image
           var variantImg = '';
           if (v && grp.colorImages[v.color]) {
             variantImg = grp.colorImages[v.color];
@@ -589,7 +616,7 @@
           row["Variant Taxable"] = v ? 'TRUE' : '';
           row["Image Src"] = img;
           row["Image Position"] = img ? (r + 1) : '';
-          row["Variant Image"] = variantImg;
+          row["Variant Image"] = variantImg; // 顏色選項對應專屬鞋圖
           row["Product Details [custom.product_details]"] = isFirstRow ? grp.description : '';
           row["Status"] = isFirstRow ? 'active' : '';
 
@@ -599,7 +626,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！Model 相已全數納入，尺碼與 Description 已修正，請下載 CSV。', 'ok');
+        printLog('🎉 全部處理完成！雜圖已全數過濾，鞋碼與描述已校正，請下載 CSV。', 'ok');
         exp.style.display = 'inline-block';
       } else {
         printLog('未獲得任何資料。', 'err');
