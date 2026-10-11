@@ -12,7 +12,7 @@ window.REGISTERED_ENGINES.push({
     var parsed = window.ENGINE_UTILS.parseColors(rawTitle, url);
     var root = new URL(url).origin;
 
-    // 1. 真實價格抓取
+    // 1. 價格抓取
     var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
     var price = '0.00';
     if (priceTag) {
@@ -21,17 +21,23 @@ window.REGISTERED_ENGINES.push({
       if (match) price = match[0].replace(/,/g, '');
     }
 
-    // 2. 主圖與大圖
+    // 2. 主圖抓取（剔除 logo_node）
     var keyImg = '';
     var allImgs = [];
     var mainEl = doc.querySelector('.keyImg img, .thumbnail img');
     if (mainEl) {
-      keyImg = mainEl.getAttribute('src') || mainEl.getAttribute('ec-data-src') || '';
-      if (keyImg.indexOf('//') === 0) keyImg = 'https:' + keyImg;
-      else if (keyImg.indexOf('/') === 0) keyImg = root + keyImg;
-      if (keyImg.indexOf('http://') === 0) keyImg = keyImg.replace('http://', 'https://');
+      var m = mainEl.getAttribute('src') || mainEl.getAttribute('ec-data-src') || '';
+      if (m.indexOf('//') === 0) m = 'https:' + m;
+      else if (m.indexOf('/') === 0) m = root + m;
+      if (m.indexOf('http://') === 0) m = m.replace('http://', 'https://');
+      
+      var mLow = m.toLowerCase();
+      if (mLow.indexOf('logo') === -1 && mLow.indexOf('node') === -1) {
+        keyImg = m;
+      }
     }
 
+    // 3. 所有大圖掃描（嚴格過濾 logo_node, naver, pay）
     var imgs = doc.querySelectorAll('img');
     for (var i = 0; i < imgs.length; i++) {
       var s = imgs[i].getAttribute('ec-data-src') || imgs[i].getAttribute('data-original') || imgs[i].getAttribute('src') || '';
@@ -41,14 +47,21 @@ window.REGISTERED_ENGINES.push({
       if (s.indexOf('http://') === 0) s = s.replace('http://', 'https://');
 
       var low = s.toLowerCase();
-      var isJunk = low.indexOf('naver') !== -1 || low.indexOf('pay') !== -1 || low.indexOf('.gif') !== -1 || low.indexOf('icon') !== -1 || low.indexOf('blank') !== -1;
+      var isJunk = low.indexOf('naver') !== -1 ||
+                   low.indexOf('pay') !== -1 ||
+                   low.indexOf('.gif') !== -1 ||
+                   low.indexOf('icon') !== -1 ||
+                   low.indexOf('blank') !== -1 ||
+                   low.indexOf('logo') !== -1 ||
+                   low.indexOf('node.png') !== -1;
+
       if (!isJunk && (low.indexOf('/big/') !== -1 || low.indexOf('rockfish.cafe24.com') !== -1)) {
         if (!keyImg) keyImg = s;
         if (allImgs.indexOf(s) === -1) allImgs.push(s);
       }
     }
 
-    // 3. 尺碼判斷
+    // 4. 尺碼判斷
     var isShoe = /ballet|flat|shoe|boot|sneaker|loafer|mule|sandal|clog|heel/i.test(parsed.title) || /category\/230|shoes/i.test(url);
     var sizes = [];
     var sizeMatch = html.match(/"option_value":\s*"(\d{3})"/g);
