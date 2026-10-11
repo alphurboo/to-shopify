@@ -160,4 +160,285 @@
       <div class="btn-bar">
         <button type="button" class="btn-gray" onclick="confirmLinks()">✅ 確認加入清單</button>
         <button type="button" id="startBtn" class="btn-blue" onclick="processAll()">🚀 開始抓取商品</button>
-        <button type="button" id="exportBtn" class="btn-green" onclick="exportShopifyCSV()">📥 下載
+        <button type="button" id="exportBtn" class="btn-green" onclick="exportShopifyCSV()">📥 下載 Shopify CSV</button>
+        <button type="button" class="btn-outline" onclick="resetForm()">清空</button>
+        <span id="urlCount" class="counter-text">待處理：0 個商品</span>
+      </div>
+
+      <div id="consoleBox">
+        <div class="log-row">系統初始化完畢，請貼上網址後點擊「確認加入清單」。</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var queue = [];
+    var finalData = [];
+
+    function printLog(text, type) {
+      var box = document.getElementById('consoleBox');
+      var div = document.createElement('div');
+      div.className = 'log-row';
+      if (type === 'ok') div.className += ' log-success';
+      if (type === 'err') div.className += ' log-error';
+      if (type === 'info') div.className += ' log-accent';
+
+      var now = new Date();
+      var timeStr = now.toTimeString().split(' ')[0];
+      div.innerText = '[' + timeStr + '] ' + text;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function confirmLinks() {
+      var val = document.getElementById('urlInput').value;
+      var rawLines = val.split('\n');
+      var clean = [];
+
+      for (var i = 0; i < rawLines.length; i++) {
+        var str = rawLines[i].trim();
+        if (str.indexOf('http://') === 0 || str.indexOf('https://') === 0) {
+          if (clean.indexOf(str) === -1) {
+            clean.push(str);
+          }
+        }
+      }
+
+      queue = clean;
+      document.getElementById('urlCount').innerText = '待處理：' + queue.length + ' 個商品';
+
+      if (queue.length > 0) {
+        printLog('已鎖定 ' + queue.length + ' 個有效連結！可以點擊「開始抓取商品」。', 'ok');
+      } else {
+        alert('請先輸入至少一條以 http:// 或 https:// 開頭的網址！');
+      }
+    }
+
+    function resetForm() {
+      document.getElementById('urlInput').value = '';
+      queue = [];
+      finalData = [];
+      document.getElementById('urlCount').innerText = '待處理：0 個商品';
+      document.getElementById('exportBtn').style.display = 'none';
+      printLog('已清空所有內容。', 'info');
+    }
+
+    function sanitizeHandle(str) {
+      return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
+    }
+
+    async function loadHtml(url) {
+      var proxyList = [
+        'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+        'https://corsproxy.io/?' + encodeURIComponent(url),
+        'https://api.allorigins.win/raw?url=' + encodeURIComponent(url)
+      ];
+
+      for (var p = 0; p < proxyList.length; p++) {
+        try {
+          var response = await fetch(proxyList[p]);
+          if (response.ok) {
+            var bodyText = await response.text();
+            if (bodyText && bodyText.length > 300) {
+              return bodyText;
+            }
+          }
+        } catch (err) {}
+      }
+      throw new Error('代理通道無法存取該頁面');
+    }
+
+    function extractProduct(html, productUrl) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+
+      // 提取名稱
+      var titleTag = doc.querySelector('.headingArea h2, .name, font.ec-product-name, meta[property="og:title"]');
+      var title = '';
+      if (titleTag) {
+        title = titleTag.getAttribute('content') || titleTag.innerText || '';
+        title = title.replace('Product Name :', '').trim();
+      }
+      if (!title && doc.title) {
+        title = doc.title.split('-')[0].trim();
+      }
+      if (!title) title = 'Rockfish Product';
+
+      // 提取價格
+      var priceTag = doc.querySelector('#span_product_price_text, .price, span[id*="price"], meta[property="product:sale_price:amount"]');
+      var price = '0.00';
+      if (priceTag) {
+        var pText = priceTag.getAttribute('content') || priceTag.innerText || '';
+        var match = pText.match(/[\d,.]+/);
+        if (match) price = match[0].replace(/,/g, '');
+      }
+
+      // 提取圖片
+      var uri = new URL(productUrl);
+      var root = uri.origin;
+      var images = [];
+      var imgs = doc.querySelectorAll('.keyImg img, .detail_view img, #prdDetail img, .thumbnail img');
+
+      for (var m = 0; m < imgs.length; m++) {
+        var src = imgs[m].getAttribute('src') || imgs[m].getAttribute('ec-data-src') || '';
+        if (src) {
+          if (src.indexOf('//') === 0) src = 'https:' + src;
+          else if (src.indexOf('/') === 0) src = root + src;
+
+          var low = src.toLowerCase();
+          if (low.indexOf('icon') === -1 && low.indexOf('btn') === -1 && low.indexOf('blank') === -1 && low.indexOf('common') === -1) {
+            if (images.indexOf(src) === -1) {
+              images.push(src);
+            }
+          }
+        }
+      }
+
+      // 提取顏色與尺碼
+      var colors = [];
+      var sizes = [];
+      var selects = doc.querySelectorAll('select[id*="product_option_id"], select.ProductOption0');
+
+      for (var s = 0; s < selects.length; s++) {
+        var sel = selects[s];
+        var thText = '';
+        var tr = sel.closest('tr');
+        if (tr && tr.querySelector('th')) {
+          thText = tr.querySelector('th').innerText.toLowerCase();
+        }
+
+        var optElems = sel.querySelectorAll('option');
+        var optList = [];
+        for (var o = 0; o < optElems.length; o++) {
+          var t = optElems[o].innerText.trim();
+          if (t && t.indexOf('*') !== 0 && t.toLowerCase().indexOf('choose') === -1 && t.toLowerCase().indexOf('선택') === -1) {
+            t = t.replace(/\[.*?(sold out|품절).*?\]/gi, '').trim();
+            if (t && optList.indexOf(t) === -1) optList.push(t);
+          }
+        }
+
+        if (thText.indexOf('color') !== -1 || thText.indexOf('색상') !== -1) {
+          for (var c = 0; c < optList.length; c++) if (colors.indexOf(optList[c]) === -1) colors.push(optList[c]);
+        } else if (thText.indexOf('size') !== -1 || thText.indexOf('사이즈') !== -1) {
+          for (var z = 0; z < optList.length; z++) if (sizes.indexOf(optList[z]) === -1) sizes.push(optList[z]);
+        } else {
+          if (colors.length === 0) colors = optList;
+          else if (sizes.length === 0) sizes = optList;
+        }
+      }
+
+      if (colors.length === 0) colors = ['Default Color'];
+      if (sizes.length === 0) sizes = ['Default Size'];
+
+      return {
+        title: title,
+        handle: sanitizeHandle(title),
+        price: price,
+        images: images,
+        colors: colors,
+        sizes: sizes
+      };
+    }
+
+    async function processAll() {
+      if (queue.length === 0) {
+        confirmLinks();
+      }
+      if (queue.length === 0) return;
+
+      var btn = document.getElementById('startBtn');
+      var exp = document.getElementById('exportBtn');
+      btn.disabled = true;
+      exp.style.display = 'none';
+      finalData = [];
+
+      printLog('開始批次抓取 ' + queue.length + ' 個商品...', 'info');
+
+      for (var i = 0; i < queue.length; i++) {
+        var u = queue[i];
+        printLog('(' + (i + 1) + '/' + queue.length + ') 抓取中: ' + u);
+
+        try {
+          var raw = await loadHtml(u);
+          var item = extractProduct(raw, u);
+
+          printLog('✓ 成功: ' + item.title + ' (色:' + item.colors.length + ', 碼:' + item.sizes.length + ', 圖:' + item.images.length + ')', 'ok');
+
+          var hasColor = (item.colors[0] !== 'Default Color');
+          var hasSize = (item.sizes[0] !== 'Default Size');
+          var variants = [];
+
+          for (var c = 0; c < item.colors.length; c++) {
+            for (var s = 0; s < item.sizes.length; s++) {
+              variants.push({ color: item.colors[c], size: item.sizes[s] });
+            }
+          }
+
+          var rowCount = Math.max(variants.length, item.images.length);
+
+          for (var r = 0; r < rowCount; r++) {
+            var first = (r === 0);
+            var v = variants[r] || null;
+            var img = item.images[r] || '';
+
+            finalData.push({
+              "Handle": item.handle,
+              "Title": first ? item.title : '',
+              "Body (HTML)": first ? ('<p>' + item.title + '</p>') : '',
+              "Vendor": first ? 'Rockfish Weatherwear' : '',
+              "Type": first ? 'Shoes' : '',
+              "Tags": first ? 'Rockfish, 代購, Korea' : '',
+              "Published": first ? 'TRUE' : '',
+              "Option1 Name": hasColor ? 'Color' : 'Title',
+              "Option1 Value": v ? (hasColor ? v.color : 'Default Title') : '',
+              "Option2 Name": hasSize ? 'Size' : '',
+              "Option2 Value": v ? (hasSize ? v.size : '') : '',
+              "Variant Price": v ? item.price : '',
+              "Variant Requires Shipping": v ? 'TRUE' : '',
+              "Variant Taxable": v ? 'TRUE' : '',
+              "Image Src": img,
+              "Image Position": img ? (r + 1) : '',
+              "Status": first ? 'active' : ''
+            });
+          }
+        } catch (err) {
+          printLog('✗ 失敗: ' + err.message, 'err');
+        }
+      }
+
+      btn.disabled = false;
+      if (finalData.length > 0) {
+        printLog('全部商品已完成！請點擊綠色「下載 Shopify CSV」。', 'ok');
+        exp.style.display = 'inline-block';
+      } else {
+        printLog('未獲得任何資料。', 'err');
+      }
+    }
+
+    function exportShopifyCSV() {
+      if (finalData.length === 0) return;
+
+      var keys = Object.keys(finalData[0]);
+      var csv = '\uFEFF';
+      csv += keys.map(function(k) { return '"' + k + '"'; }).join(',') + '\n';
+
+      for (var i = 0; i < finalData.length; i++) {
+        var row = finalData[i];
+        var line = keys.map(function(k) {
+          var val = row[k] !== undefined ? String(row[k]) : '';
+          return '"' + val.replace(/"/g, '""') + '"';
+        }).join(',');
+        csv += line + '\n';
+      }
+
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'rockfish_shopify_' + Date.now() + '.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
