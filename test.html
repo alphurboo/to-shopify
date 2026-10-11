@@ -41,7 +41,6 @@
     .engine-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #3b0764; color: #d8b4fe; font-size: 12px; margin-right: 6px; }
   </style>
 
-  <!-- 載入註冊表與各獨立 Engine -->
   <script src="engines/registry.js"></script>
   <script src="engines/rockfish.js"></script>
   <script src="engines/mardi.js"></script>
@@ -75,6 +74,10 @@
   <script>
     var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
     var textarea = document.getElementById('urlInput');
+
+    function sanitizeHandle(str) {
+      return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
+    }
 
     window.addEventListener('DOMContentLoaded', function() {
       var container = document.getElementById('engineBadges');
@@ -180,7 +183,6 @@
 
       printLog('🧪 開始執行測試，共 ' + queue.length + ' 條網址，對接 ' + engines.length + ' 個 Engine...', 'info');
 
-      // 每個 engine 建立自己嘅 group，避免互相干擾
       var engineGroups = {};
       engines.forEach(function(e) {
         engineGroups[e.id] = {};
@@ -193,13 +195,12 @@
         try {
           var html = await loadHtml(u);
 
-          // 核心：依序呼叫各個 Engine 自身的 parse function
           for (var e = 0; e < engines.length; e++) {
             var eng = engines[e];
             var parsed = eng.parse(html, u);
 
             var taggedTitle = parsed.title + ' (' + eng.id + ')';
-            var taggedHandle = parsed.handle + '-' + eng.id;
+            var taggedHandle = (parsed.handle || sanitizeHandle(parsed.title)) + '-' + eng.id;
 
             var grp = engineGroups[eng.id];
             if (!grp[taggedHandle]) {
@@ -231,7 +232,6 @@
               }
             }
 
-            // 建立變體
             if (parsed.sizes && parsed.sizes.length > 0) {
               for (var s = 0; s < parsed.sizes.length; s++) {
                 var exists = false;
@@ -264,7 +264,6 @@
         }
       }
 
-      // 整合輸出到同一份 CSV
       var combinedRows = [];
 
       engines.forEach(function(eng) {
