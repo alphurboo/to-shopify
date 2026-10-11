@@ -40,7 +40,6 @@
     .log-accent { color: #38bdf8; }
   </style>
 
-  <!-- 引入共用模組與專屬引擎 -->
   <script src="engines/registry.js"></script>
   <script src="engines/rockfish.js"></script>
 </head>
@@ -70,6 +69,10 @@
   <script>
     var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
     var textarea = document.getElementById('urlInput');
+
+    function sanitizeHandle(str) {
+      return (str || 'product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
+    }
 
     textarea.addEventListener('paste', function(e) {
       e.preventDefault();
@@ -159,7 +162,6 @@
         return;
       }
 
-      // 取得 Rockfish 註冊引擎
       var engine = window.REGISTERED_ENGINES.find(function(e) { return e.id === 'rockfish'; });
       var btn = document.getElementById('startBtn');
       btn.disabled = true;
@@ -179,7 +181,7 @@
           try {
             var raw = await loadHtml(u);
             var item = engine.parse(raw, u);
-            var handle = window.ENGINE_UTILS.sanitizeHandle(item.title);
+            var handle = item.handle || sanitizeHandle(item.title);
             var sizeMsg = item.sizes.length > 0 ? ('碼:' + item.sizes.join('/')) : '無尺碼規格';
             printLog('✓ 完成: ' + item.title + ' [' + item.color + '] (' + sizeMsg + ')', 'ok');
 
