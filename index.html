@@ -51,25 +51,10 @@
       margin-bottom: 8px;
     }
 
-    .worker-input {
-      display: block;
-      width: 100%;
-      height: 38px;
-      background: #020617;
-      color: #38bdf8;
-      border: 1px solid #475569;
-      border-radius: 6px;
-      padding: 0 12px;
-      font-size: 13px;
-      box-sizing: border-box;
-      outline: none;
-      margin-bottom: 16px;
-    }
-
     #urlInput {
       display: block;
       width: 100%;
-      height: 160px;
+      height: 180px;
       background: #020617;
       color: #ffffff;
       border: 1px solid #475569;
@@ -81,7 +66,7 @@
       resize: vertical;
     }
 
-    #urlInput:focus, .worker-input:focus {
+    #urlInput:focus {
       border-color: #38bdf8;
     }
 
@@ -147,12 +132,9 @@
 
   <div class="main-wrapper">
     <div class="header-title">🛍️ Rockfish to Shopify 轉換工具</div>
-    <div class="header-desc">採用多線程並行高速抓取，自動 Combine 同款不同色為同一產品並輸出 Shopify CSV。</div>
+    <div class="header-desc">已內建 Cloudflare Worker 極速引擎，支援 30+ 條商品網址高速抓取並自動合併同款顏色。</div>
 
     <div class="card-box">
-      <label class="field-label" for="workerUrl">專屬 Cloudflare Worker Proxy 網址（可選，極速專用）：</label>
-      <input type="text" id="workerUrl" class="worker-input" placeholder="例如：https://my-proxy.xxxx.workers.dev（留空則自動使用免費公共線路）">
-
       <label class="field-label" for="urlInput">商品網址列表（一行一條，支援 30+ 條）：</label>
       <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://rockfish-weatherwear.co.kr/product/new-5-banding-ballet-flatsleather-beige/4282/category/230/display/1/"></textarea>
 
@@ -171,6 +153,9 @@
   </div>
 
   <script>
+    // 已直接綁定你的專屬 Cloudflare Worker 極速代理
+    var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
+
     var queue = [];
     var finalData = [];
 
@@ -260,30 +245,30 @@
     }
 
     async function loadHtml(url) {
-      var customWorker = document.getElementById('workerUrl').value.trim();
-      var proxyList = [];
+      // 優先直行你的專屬 Worker，毫秒級響應
+      try {
+        var res = await fetch(WORKER_PROXY + encodeURIComponent(url));
+        if (res.ok) {
+          var text = await res.text();
+          if (text && text.length > 300) return text;
+        }
+      } catch (e) {}
 
-      if (customWorker) {
-        var cleanWorker = customWorker.replace(/\/+$/, '');
-        proxyList.push(cleanWorker + '/?url=' + encodeURIComponent(url));
-      }
-
-      proxyList.push('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url));
-      proxyList.push('https://corsproxy.io/?' + encodeURIComponent(url));
-      proxyList.push('https://api.allorigins.win/raw?url=' + encodeURIComponent(url));
-
-      for (var p = 0; p < proxyList.length; p++) {
+      // 備用免費通道
+      var fallbacks = [
+        'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+        'https://corsproxy.io/?' + encodeURIComponent(url)
+      ];
+      for (var f = 0; f < fallbacks.length; f++) {
         try {
-          var response = await fetch(proxyList[p]);
-          if (response.ok) {
-            var bodyText = await response.text();
-            if (bodyText && bodyText.length > 300) {
-              return bodyText;
-            }
+          var fbRes = await fetch(fallbacks[f]);
+          if (fbRes.ok) {
+            var fbText = await fbRes.text();
+            if (fbText && fbText.length > 300) return fbText;
           }
         } catch (err) {}
       }
-      throw new Error('代理通道無法存取該頁面');
+      throw new Error('無法存取該頁面');
     }
 
     function extractProduct(html, productUrl) {
@@ -342,7 +327,8 @@
       if (sizes.length === 0) {
         var selects = doc.querySelectorAll('select[id*="product_option_id"], select.ProductOption0');
         for (var s = 0; s < selects.length; s++) {
-          var optElems = selects[s].querySelectorAll('option');
+          var sel = selects[s];
+          var optElems = sel.querySelectorAll('option');
           for (var o = 0; o < optElems.length; o++) {
             var t = optElems[o].innerText.trim();
             if (t && t.indexOf('*') !== 0 && t.toLowerCase().indexOf('choose') === -1 && t.toLowerCase().indexOf('선택') === -1) {
@@ -353,7 +339,9 @@
         }
       }
 
-      if (sizes.length === 0) sizes = ['230', '235', '240', '245', '250', '255'];
+      if (sizes.length === 0) {
+        sizes = ['230', '235', '240', '245', '250', '255'];
+      }
 
       return {
         title: title,
@@ -365,7 +353,6 @@
       };
     }
 
-    // 核心並行抓取引擎（最多 5 條同時發出請求）
     async function processAllParallel() {
       if (queue.length === 0) confirmLinks();
       if (queue.length === 0) return;
@@ -376,17 +363,17 @@
       exp.style.display = 'none';
       finalData = [];
 
-      printLog('🚀 啟動並行引擎，正在同時處理 ' + queue.length + ' 個商品...', 'info');
+      printLog('🚀 啟動極速引擎，並行抓取 ' + queue.length + ' 個商品中...', 'info');
 
       var productGroups = {};
-      var concurrency = 5; // 同時抓 5 條
+      var concurrency = 5;
       var currentIndex = 0;
 
       async function worker() {
         while (currentIndex < queue.length) {
           var idx = currentIndex++;
           var u = queue[idx];
-          printLog('正在連線 (' + (idx + 1) + '/' + queue.length + '): ' + u);
+          printLog('正在讀取 (' + (idx + 1) + '/' + queue.length + '): ' + u);
 
           try {
             var raw = await loadHtml(u);
@@ -438,7 +425,6 @@
       }
       await Promise.all(pool);
 
-      // 排版 Shopify CSV
       var groupKeys = Object.keys(productGroups);
       for (var g = 0; g < groupKeys.length; g++) {
         var grp = productGroups[groupKeys[g]];
@@ -473,7 +459,7 @@
 
       btn.disabled = false;
       if (finalData.length > 0) {
-        printLog('🎉 全部處理完成！請點擊綠色「下載 Shopify CSV」。', 'ok');
+        printLog('🎉 全部處理完成！已自動 Combine 同款商品，請點擊綠色按鈕下載 CSV。', 'ok');
         exp.style.display = 'inline-block';
       } else {
         printLog('未獲得任何資料。', 'err');
