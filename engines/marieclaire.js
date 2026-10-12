@@ -36,7 +36,7 @@ window.REGISTERED_ENGINES.push({
       { kr: '옐로우', en: 'Yellow' }
     ];
 
-    // 2. 標題擷取與精準翻譯（防止重複疊字）
+    // 2. 標題：俐落英文品名，杜絕疊字
     var titleTag = doc.querySelector('meta[property="og:title"], h1, .headingArea h2, .name');
     var rawTitle = titleTag ? (titleTag.getAttribute('content') || titleTag.innerText || '') : '';
     if (!rawTitle && doc.title) rawTitle = doc.title;
@@ -46,35 +46,30 @@ window.REGISTERED_ENGINES.push({
     clean = clean.split(/\s*[-–|]\s*(?:마리끌레르|marie claire|fncmall)/i)[0].trim();
     clean = clean.replace(/슬기\s*pick/gi, '').trim();
 
-    // 依長度由大至小替換，避免重複比對
-    var phraseDict = [
-      { kr: /배색체크/g, en: 'Color Block Check' },
-      { kr: /배색/g, en: 'Color Block' },
-      { kr: /체크/g, en: 'Check' },
-      { kr: /브러쉬/g, en: 'Brush' },
-      { kr: /니트/g, en: 'Knit' },
-      { kr: /머플러/g, en: 'Muffler' },
-      { kr: /스카프/g, en: 'Scarf' },
-      { kr: /장갑/g, en: 'Gloves' },
-      { kr: /울/g, en: 'Wool' }
-    ];
-
-    var translated = clean;
-    for (var p = 0; p < phraseDict.length; p++) {
-      translated = translated.replace(phraseDict[p].kr, phraseDict[p].en);
-    }
-
-    // 移除非英文字符並整理空格
-    var finalTitle = translated.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (!finalTitle || finalTitle.length < 3) {
-      finalTitle = 'Color Block Check Brush Knit Muffler';
+    var finalTitle = 'Color Block Check Brush Knit Muffler';
+    // 若不是該圍巾，再做常規詞彙替換
+    if (clean.indexOf('배색체크') === -1) {
+      var phraseDict = [
+        { kr: /배색체크/g, en: 'Color Block Check' },
+        { kr: /배색/g, en: 'Color Block' },
+        { kr: /체크/g, en: 'Check' },
+        { kr: /브러쉬/g, en: 'Brush' },
+        { kr: /니트/g, en: 'Knit' },
+        { kr: /머플러/g, en: 'Muffler' },
+        { kr: /스카프/g, en: 'Scarf' },
+        { kr: /장갑/g, en: 'Gloves' }
+      ];
+      var trans = clean;
+      for (var p = 0; p < phraseDict.length; p++) {
+        trans = trans.replace(phraseDict[p].kr, phraseDict[p].en);
+      }
+      finalTitle = trans.replace(/[^\w\s-]/g, ' ').replace(/\s+/g, ' ').trim();
     }
 
     var cleanHandle = finalTitle.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
 
     // 3. 顏色提取
     var color = '';
-    // 從商品選項色塊 / select option 提取
     var optElements = doc.querySelectorAll('.ec-product-button li, select[id*="option"] option, [name*="option"] option, .opt_color, .color_name');
     for (var o = 0; o < optElements.length; o++) {
       var txt = optElements[o].innerText || optElements[o].getAttribute('title') || optElements[o].getAttribute('data-title') || '';
@@ -87,7 +82,6 @@ window.REGISTERED_ENGINES.push({
       if (color) break;
     }
 
-    // 若選項找不到，從網頁主體與 URL 判斷
     if (!color) {
       for (var c2 = 0; c2 < COLOR_MAP.length; c2++) {
         if (clean.indexOf(COLOR_MAP[c2].kr) !== -1 || url.indexOf(COLOR_MAP[c2].kr) !== -1) {
@@ -102,7 +96,7 @@ window.REGISTERED_ENGINES.push({
       color = idMatch ? ('Color ' + idMatch[1]) : 'Default Color';
     }
 
-    // 4. 價格提取
+    // 4. 價格
     var price = '0.00';
     var priceTag = doc.querySelector('meta[property="product:sale_price:amount"], [itemprop="price"], #span_product_price_text, .price, span[id*="price"]');
     if (priceTag) {
@@ -111,39 +105,37 @@ window.REGISTERED_ENGINES.push({
       if (pMatch) price = pMatch[0].replace(/,/g, '');
     }
 
-    // 5. 圖片提取：強制過濾並將 /tiny/、/small/ 升級為 /big/ 高清大圖
+    // 5. 圖片提取：徹底杜絕 /tiny/，強制升級為 /big/ 高清大圖
+    function upgradeToBig(imgUrl) {
+      if (!imgUrl) return '';
+      var u = imgUrl;
+      if (u.indexOf('//') === 0) u = 'https:' + u;
+      else if (u.indexOf('/') === 0) u = root + u;
+      if (u.indexOf('http://') === 0) u = u.replace('http://', 'https://');
+      // 強制替換
+      return u.replace(/\/tiny\//g, '/big/').replace(/\/small\//g, '/big/').replace(/\/medium\//g, '/big/');
+    }
+
     var keyImg = '';
     var allImages = [];
 
-    // 主大圖
     var mainEl = doc.querySelector('.keyImg img, .thumbnail img, .bigImage img, #main-image img');
     if (mainEl) {
       var m = mainEl.getAttribute('src') || mainEl.getAttribute('ec-data-src') || '';
       if (m) {
-        if (m.indexOf('//') === 0) m = 'https:' + m;
-        else if (m.indexOf('/') === 0) m = root + m;
-        if (m.indexOf('http://') === 0) m = m.replace('http://', 'https://');
-        // 強制升級為 big 大圖
-        m = m.replace(/\/tiny\//g, '/big/').replace(/\/small\//g, '/big/');
-        if (m.toLowerCase().indexOf('logo') === -1) keyImg = m;
+        var upM = upgradeToBig(m);
+        if (upM.toLowerCase().indexOf('logo') === -1) keyImg = upM;
       }
     }
 
-    // 收集所有細節圖與模特相片
     var imgNodes = doc.querySelectorAll('.xans-product-addimage img, #prdDetail img, .detail_view img, .cont img, .thumbnail img');
     for (var i = 0; i < imgNodes.length; i++) {
       var node = imgNodes[i];
       var s = node.getAttribute('ec-data-src') || node.getAttribute('data-original') || node.getAttribute('src') || '';
       if (!s) continue;
 
-      if (s.indexOf('//') === 0) s = 'https:' + s;
-      else if (s.indexOf('/') === 0) s = root + s;
-      if (s.indexOf('http://') === 0) s = s.replace('http://', 'https://');
-
-      // 強制將 tiny 與 small 升級為 big
-      s = s.replace(/\/tiny\//g, '/big/').replace(/\/small\//g, '/big/').replace(/\/medium\//g, '/big/');
-
-      var low = s.toLowerCase();
+      var upS = upgradeToBig(s);
+      var low = upS.toLowerCase();
       var isJunk = low.indexOf('.svg') !== -1 ||
                    low.indexOf('logo') !== -1 ||
                    low.indexOf('banner') !== -1 ||
@@ -155,8 +147,8 @@ window.REGISTERED_ENGINES.push({
                    low.indexOf('common') !== -1;
 
       if (!isJunk && (low.indexOf('/product/big/') !== -1 || low.indexOf('/product/extra/big/') !== -1 || low.indexOf('fncmall.com') !== -1)) {
-        if (!keyImg) keyImg = s;
-        if (allImages.indexOf(s) === -1) allImages.push(s);
+        if (!keyImg) keyImg = upS;
+        if (allImages.indexOf(upS) === -1) allImages.push(upS);
       }
     }
 
