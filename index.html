@@ -1,72 +1,117 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shopify 品牌轉換工具導航</title>
+  <title>韓國電商 to Shopify CSV 轉換器總覽大廳</title>
   <style>
-    body {
-      background: #0f172a; color: #f8fafc;
+    html, body {
+      background: #0f172a !important; color: #f8fafc !important;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      margin: 0; padding: 60px 20px; display: flex; justify-content: center;
+      margin: 0; padding: 0; min-height: 100%;
     }
-    .container { width: 100%; max-width: 680px; text-align: center; }
-    h1 { color: #38bdf8; font-size: 28px; margin-bottom: 8px; }
-    p { color: #94a3b8; font-size: 14px; margin-bottom: 32px; }
-    .grid { display: flex; flex-direction: column; gap: 14px; }
+    .main-wrapper { max-width: 900px; margin: 50px auto; padding: 0 20px; }
+    .header-title { color: #38bdf8; font-size: 30px; font-weight: 800; margin-bottom: 8px; }
+    .header-desc { color: #94a3b8; font-size: 15px; margin-bottom: 32px; line-height: 1.6; }
+    
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+    .card-box {
+      background: #1e293b; border: 1px solid #334155; border-radius: 12px;
+      padding: 24px; display: flex; flex-direction: column; justify-content: space-between;
+      text-decoration: none; color: inherit; transition: all 0.2s ease;
+    }
+    .card-box:hover {
+      transform: translateY(-3px);
+      border-color: #38bdf8;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    .card-title { font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .card-desc { font-size: 13px; color: #94a3b8; line-height: 1.5; margin-bottom: 20px; flex-grow: 1; }
     .card-btn {
-      display: block; background: #1e293b; border: 1px solid #334155; border-radius: 10px;
-      padding: 18px 22px; text-decoration: none; color: #ffffff; text-align: left;
-      transition: all 0.2s ease;
+      display: inline-block; text-align: center; padding: 10px 16px; border-radius: 6px;
+      font-size: 14px; font-weight: 600; text-decoration: none; background: #0284c7; color: #ffffff;
     }
-    .card-btn:hover { border-color: #38bdf8; transform: translateY(-2px); background: #243248; }
-    .card-btn h3 { margin: 0 0 6px 0; font-size: 17px; color: #38bdf8; display: flex; justify-content: space-between; }
-    .card-btn p { margin: 0; color: #94a3b8; font-size: 13px; line-height: 1.4; }
-    .badge { font-size: 12px; padding: 2px 8px; border-radius: 4px; background: #0284c7; color: #ffffff; }
-    .test-card { border-color: #7c3aed; }
-    .test-card h3 { color: #c084fc; }
-    .test-badge { background: #9333ea; }
+    .card-btn:hover { background: #0369a1; }
+
+    /* 各品牌專屬配色 */
+    .card-rockfish .card-btn { background: #0284c7; }
+    .card-mardi .card-btn { background: #38bdf8; color: #0f172a; }
+    .card-marieclaire .card-btn { background: #e11d48; color: #ffffff; }
+    .card-maatila .card-btn { background: #d97706; color: #ffffff; }
+    .card-test .card-btn { background: #9333ea; color: #ffffff; }
+
+    .test-box {
+      background: #1e1b4b; border: 1px solid #4338ca; border-radius: 12px;
+      padding: 24px; display: flex; align-items: center; justify-content: space-between;
+      margin-top: 10px;
+    }
   </style>
 
-  <!-- 載入註冊中心與所有引擎 -->
-  <!-- 載入順序：registry 一定要排第一，其他 engine 排後面 -->
+  <!-- 1. 先引入登記冊清單 -->
   <script src="engines/registry.js"></script>
+
+  <!-- 2. 引入各個獨立 Engine 腳本（有邊個就會出邊個掣） -->
   <script src="engines/rockfish.js"></script>
   <script src="engines/mardi.js"></script>
   <script src="engines/marieclaire.js"></script>
+  <script src="engines/maatila.js"></script>
 </head>
 <body>
 
-<div class="container">
-  <h1>🛍️ Shopify 轉換工具中心</h1>
-  <p id="subTitle">載入中...</p>
+  <div class="main-wrapper">
+    <div class="header-title">🛍️ 韓國電商 to Shopify 導航大廳</div>
+    <div class="header-desc">
+      選擇品牌進入專屬轉換頁面，或使用下方測試工具進行全引擎動態對比。
+    </div>
 
-  <div class="grid" id="engineList">
-    <!-- 卡片將由 JS 自動生成 -->
+    <!-- 動態生成各品牌專屬卡片按鈕 -->
+    <div class="grid-container" id="engineGrid"></div>
+
+    <!-- 綜合測試引擎 -->
+    <div class="test-box">
+      <div>
+        <div style="font-size: 18px; font-weight: 700; color: #e0e7ff; margin-bottom: 4px;">🧪 多引擎動態對比測試工具 (Test Engine)</div>
+        <div style="font-size: 13px; color: #a5b4fc;">支援同時貼上不同品牌連結，各引擎獨立解析並整合輸出為單一 CSV。</div>
+      </div>
+      <a href="test.html" class="card-btn" style="background:#6366f1;">進入測試工具 →</a>
+    </div>
   </div>
 
-  <div style="margin-top: 18px;">
-    <a href="test.html" class="card-btn test-card">
-      <h3>🧪 多引擎對比測試工具 (Test Engine) <span class="badge test-badge">全引擎自動跑</span></h3>
-      <p>貼入未知新品牌，全自動呼叫上方所有引擎解析，並輸出單一 CSV 檔（標註 engine id）供對比。</p>
-    </a>
-  </div>
-</div>
+  <script>
+    // 品牌圖示對照
+    var ICONS = {
+      'rockfish': '👢',
+      'mardi': '🌸',
+      'marieclaire': '🧣',
+      'maatila': '🛏️'
+    };
 
-<script>
-  window.addEventListener('DOMContentLoaded', function() {
-    var engines = window.REGISTERED_ENGINES || [];
-    document.getElementById('subTitle').innerText = '目前已啟用 ' + engines.length + ' 個專屬品牌解析引擎：';
+    window.addEventListener('DOMContentLoaded', function() {
+      var grid = document.getElementById('engineGrid');
+      var engines = window.REGISTERED_ENGINES || [];
 
-    var container = document.getElementById('engineList');
-    container.innerHTML = engines.map(function(e) {
-      return '<a href="' + e.pageUrl + '" class="card-btn">' +
-               '<h3>' + e.name + ' <span class="badge">專屬</span></h3>' +
-               '<p>' + e.description + '</p>' +
-             '</a>';
-    }).join('');
-  });
-</script>
+      if (engines.length === 0) {
+        grid.innerHTML = '<div style="color:#ef4444;">未偵測到任何已註冊引擎，請檢查 engines/ 目錄。</div>';
+        return;
+      }
 
+      grid.innerHTML = engines.map(function(e) {
+        var icon = ICONS[e.id] || '📦';
+        return '' +
+          '<div class="card-box card-' + e.id + '">' +
+            '<div>' +
+              '<div class="card-title">' + icon + ' ' + e.name + '</div>' +
+              '<div class="card-desc">' + (e.description || '點擊進入專屬抓取與轉換介面。') + '</div>' +
+            '</div>' +
+            '<a href="' + (e.pageUrl || (e.id + '.html')) + '" class="card-btn">進入轉換器 →</a>' +
+          '</div>';
+      }).join('');
+    });
+  </script>
 </body>
 </html>
