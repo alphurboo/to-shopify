@@ -196,8 +196,8 @@
           var html = await loadHtml(u);
 
           for (var e = 0; e < engines.length; e++) {
-            var eng = engines[e];
-            var parsed = eng.parse(html, u);
+  var eng = engines[e];
+  var parsed = await eng.parse(html, u);
 
             var taggedTitle = parsed.title + ' (' + eng.id + ')';
             var taggedHandle = (parsed.handle || sanitizeHandle(parsed.title)) + '-' + eng.id;
