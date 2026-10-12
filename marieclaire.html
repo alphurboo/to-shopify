@@ -180,8 +180,8 @@
 
           try {
             var raw = await loadHtml(u);
-            var item = engine.parse(raw, u);
-            var handle = item.handle || sanitizeHandle(item.title);
+var item = await engine.parse(raw, u); //  加喺呢度！
+var handle = item.handle || sanitizeHandle(item.title);
             printLog('✓ 完成: ' + item.title + ' [' + item.color + '] (相片:' + item.images.length + '張)', 'ok');
 
             if (!productGroups[handle]) {
