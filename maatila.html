@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maatila to Shopify 轉換器</title>
+  <style>
+    html, body {
+      background: #0f172a !important; color: #f8fafc !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; padding: 0; min-height: 100%;
+    }
+    .main-wrapper { max-width: 860px; margin: 40px auto; padding: 0 20px; display: block; }
+    .header-title { color: #f59e0b; font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .header-desc { color: #94a3b8; font-size: 14px; margin-bottom: 24px; }
+    .card-box { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 24px; display: block; }
+    .field-label { display: block; color: #ffffff; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    #urlInput {
+      display: block; width: 100%; height: 180px; background: #020617; color: #ffffff;
+      border: 1px solid #475569; border-radius: 6px; padding: 12px; font-size: 14px;
+      box-sizing: border-box; outline: none; resize: vertical; line-height: 1.5;
+    }
+    #urlInput:focus { border-color: #f59e0b; }
+    .btn-bar { margin-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    button { padding: 11px 22px; font-size: 14px; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; }
+    .btn-amber { background: #d97706; color: #ffffff; }
+    .btn-amber:hover { background: #b45309; }
+    .btn-amber:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-outline { background: transparent; color: #94a3b8; border: 1px solid #475569; }
+    .btn-outline:hover { background: #334155; color: #ffffff; }
+    .counter-text { color: #fbbf24; font-size: 13px; font-weight: 600; margin-left: auto; }
+    #consoleBox {
+      margin-top: 20px; background: #020617; border: 1px solid #334155; border-radius: 6px;
+      padding: 14px; height: 180px; overflow-y: scroll; font-family: monospace; font-size: 13px;
+      line-height: 1.6; box-sizing: border-box;
+    }
+    .log-row { color: #94a3b8; word-break: break-all; }
+    .log-success { color: #34d399; }
+    .log-error { color: #f87171; }
+    .log-accent { color: #fbbf24; }
+  </style>
+
+  <script src="engines/registry.js"></script>
+  <script src="engines/maatila.js"></script>
+</head>
+<body>
+
+  <div class="main-wrapper">
+    <div style="margin-bottom:12px;"><a href="index.html" style="color:#94a3b8;text-decoration:none;">← 返回導航大廳</a></div>
+    <div class="header-title">🛏️ Maatila 專屬轉換器</div>
+    <div class="header-desc">支援 MakeShop 按鈕選項矩陣解析（季節 / 顏色 / 尺寸）、抓齊全部大圖與詳情圖，並自動翻譯英文品名匯出 Shopify CSV。</div>
+
+    <div class="card-box">
+      <label class="field-label" for="urlInput">Maatila 商品網址列表（貼上自動跳下一行）：</label>
+      <textarea id="urlInput" placeholder="請在此貼上連結：&#10;https://www.maatila.co.kr/shop/shopdetail.html?branduid=1135991"></textarea>
+
+      <div class="btn-bar">
+        <button type="button" id="startBtn" class="btn-amber" onclick="processAllParallel()">🚀 一鍵抓取並自動下載 CSV</button>
+        <button type="button" class="btn-outline" onclick="resetForm()">清空</button>
+        <span id="urlCount" class="counter-text">已輸入：0 個商品</span>
+      </div>
+
+      <div id="consoleBox">
+        <div class="log-row">系統就緒。</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var WORKER_PROXY = 'https://shopify.chansimon380.workers.dev/?url=';
+    var textarea = document.getElementById('urlInput');
+
+    textarea.addEventListener('paste', function(e) {
+      e.preventDefault();
+      var pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      if (!pastedText) return;
+      var current = this.value;
+      var start = this.selectionStart;
+      var end = this.selectionEnd;
+      var toInsert = pastedText.trim();
+      if (!toInsert.endsWith('\n')) toInsert += '\n';
+      var before = current.substring(0, start);
+      var after = current.substring(end);
+      if (before.length > 0 && !before.endsWith('\n')) toInsert = '\n' + toInsert;
+      this.value = before + toInsert + after;
+      var newPos = (before + toInsert).length;
+      this.selectionStart = newPos;
+      this.selectionEnd = newPos;
+      updateCount();
+    });
+
+    textarea.addEventListener('input', updateCount);
+
+    function getValidUrls() {
+      var lines = textarea.value.split('\n');
+      var clean = [];
+      for (var i = 0; i < lines.length; i++) {
+        var str = lines[i].trim();
+        if (str.indexOf('http://') === 0 || str.indexOf('https://') === 0) {
+          if (clean.indexOf(str) === -1) clean.push(str);
+        }
+      }
+      return clean;
+    }
+
+    function updateCount() {
+      var urls = getValidUrls();
+      document.getElementById('urlCount').innerText = '已輸入：' + urls.length + ' 個商品';
+    }
+
+    function printLog(text, type) {
+      var box = document.getElementById('consoleBox');
+      var div = document.createElement('div');
+      div.className = 'log-row';
+      if (type === 'ok') div.className += ' log-success';
+      if (type === 'err') div.className += ' log-error';
+      if (type === 'info') div.className += ' log-accent';
+      var timeStr = new Date().toTimeString().split(' ')[0];
+      div.innerText = '[' + timeStr + '] ' + text;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function resetForm() {
+      textarea.value = '';
+      updateCount();
+      printLog('已清空所有內容。', 'info');
+    }
+
+    async function loadHtml(url) {
+      try {
+        var res = await fetch(WORKER_PROXY + encodeURIComponent(url));
+        if (res.ok) {
+          var text = await res.text();
+          if (text && text.length > 300) return text;
+        }
+      } catch (e) {}
+      var fallbacks = [
+        'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+        'https://corsproxy.io/?' + encodeURIComponent(url)
+      ];
+      for (var f = 0; f < fallbacks.length; f++) {
+        try {
+          var fbRes = await fetch(fallbacks[f]);
+          if (fbRes.ok) {
+            var fbText = await fbRes.text();
+            if (fbText && fbText.length > 300) return fbText;
+          }
+        } catch (err) {}
+      }
+      throw new Error('無法存取該頁面');
+    }
+
+    async function processAllParallel() {
+      var queue = getValidUrls();
+      if (queue.length === 0) {
+        alert('請先在輸入框貼上至少一條網址！');
+        return;
+      }
+
+      var engine = window.REGISTERED_ENGINES.find(function(e) { return e.id === 'maatila'; });
+      var btn = document.getElementById('startBtn');
+      btn.disabled = true;
+
+      printLog('🚀 啟動 Maatila 專屬引擎，處理 ' + queue.length + ' 個商品...', 'info');
+
+      var finalRows = [];
+
+      for (var i = 0; i < queue.length; i++) {
+        var u = queue[i];
+        printLog('讀取 (' + (i + 1) + '/' + queue.length + '): ' + u);
+
+        try {
+          var raw = await loadHtml(u);
+          var item = await engine.parse(raw, u);
+          printLog('✓ 完成: ' + item.title + ' (規格數: ' + item.matrixVariants.length + ', 圖片: ' + item.images.length + '張)', 'ok');
+
+          var rowCount = Math.max(item.matrixVariants.length, item.images.length);
+
+          for (var r = 0; r < rowCount; r++) {
+            var isFirstRow = (r === 0);
+            var v = item.matrixVariants[r] || null;
+            var img = item.images[r] || '';
+
+            finalRows.push({
+              "Handle": item.handle,
+              "Title": isFirstRow ? item.title : '',
+              "Body (HTML)": "",
+              "Vendor": isFirstRow ? item.vendor : '',
+              "Type": isFirstRow ? item.type : '',
+              "Tags": isFirstRow ? 'Korea, Bedding, Maatila' : '',
+              "Published": "FALSE",
+              "Option1 Name": "Season",
+              "Option1 Value": v ? v.season : '',
+              "Option2 Name": "Color",
+              "Option2 Value": v ? v.color : '',
+              "Option3 Name": "Size",
+              "Option3 Value": v ? v.size : '',
+              "Variant Price": v ? v.price : item.price,
+              "Variant Requires Shipping": v ? 'TRUE' : '',
+              "Variant Taxable": v ? 'TRUE' : '',
+              "Variant Inventory Tracker": v ? "shopify" : "",
+              "Variant Inventory Policy": v ? "continue" : "",
+              "Image Src": img,
+              "Image Position": img ? (r + 1) : '',
+              "Variant Image": isFirstRow ? item.keyImage : '',
+              "Internal Note (product.metafields.custom.internal_note)": isFirstRow ? u : '',
+              "Status": isFirstRow ? 'draft' : ''
+            });
+          }
+        } catch (err) {
+          printLog('✗ 失敗: ' + err.message, 'err');
+        }
+      }
+
+      btn.disabled = false;
+      if (finalRows.length > 0) {
+        printLog('🎉 處理完畢！正在下載 Maatila Shopify CSV...', 'ok');
+        downloadCsv(finalRows, 'maatila_shopify_' + Date.now() + '.csv');
+      }
+    }
+
+    function downloadCsv(data, filename) {
+      var keys = Object.keys(data[0]);
+      var csv = '\uFEFF' + keys.map(function(k) { return '"' + k + '"'; }).join(',') + '\n';
+      for (var i = 0; i < data.length; i++) {
+        var row = data[i];
+        var line = keys.map(function(k) {
+          var val = row[k] !== undefined ? String(row[k]) : '';
+          return '"' + val.replace(/"/g, '""') + '"';
+        }).join(',');
+        csv += line + '\n';
+      }
+      var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
