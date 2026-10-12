@@ -11,7 +11,6 @@ async function translateKoToEn(text) {
       if (data && data[0]) {
         var translated = data[0].map(function(item) { return item[0]; }).join('').trim();
         if (translated) {
-          // 首字母大寫格式化
           return translated.split(/\s+/).map(function(w){
             return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
           }).join(' ');
@@ -26,13 +25,13 @@ window.REGISTERED_ENGINES.push({
   id: 'maatila',
   name: 'Maatila',
   pageUrl: 'maatila.html',
-  description: '專為 Maatila 設計：只保留 Four Seasons、動態/字典雙軌花色翻譯、剔除按鈕色塊圖、完整抓取商品大圖',
+  description: '專為 Maatila 設計：自適應有無季節按鈕、雙軌花色翻譯、剔除按鈕色塊圖、完整抓取商品大圖',
 
   parse: async function(html, url) {
     var doc = new DOMParser().parseFromString(html, 'text/html');
     var root = new URL(url).origin;
 
-    // 1. Maatila 精準花色字典庫（包含純色、條紋、格仔、甜品系列）
+    // 1. Maatila 精準花色字典庫
     var COLOR_MAP = {
       // 純色系列
       '아이보리': 'Ivory',
@@ -51,7 +50,7 @@ window.REGISTERED_ENGINES.push({
       '딥블랙': 'Deep Black',
       '화이트': 'White',
 
-      // 圖 1：甜品/蘇打/條紋系列
+      // 甜品/條紋系列
       '레몬딜버터': 'Lemon Dill Butter',
       '딸기밀크소다': 'Strawberry Milk Soda',
       '바나나살구잼': 'Banana Apricot Jam',
@@ -65,8 +64,9 @@ window.REGISTERED_ENGINES.push({
       '쿠키크럼블': 'Cookie Crumble',
       '피치브라우니': 'Peach Brownie',
 
-      // 圖 2：居家日常/花草條紋系列
+      // 居家/印花系列
       '핑크원피스': 'Pink Dress',
+      '버터쇼茨': 'Butter Shorts',
       '버터쇼츠': 'Butter Shorts',
       '블루팬츠': 'Blue Pants',
       '클로버셔츠': 'Clover Shirts',
@@ -74,7 +74,7 @@ window.REGISTERED_ENGINES.push({
       '코튼마가렛': 'Cotton Margaret',
       '블랙슈가삭스': 'Black Sugar Socks',
 
-      // 圖 3：法式休閒/條紋/瑪莉珍系列
+      // Guard M2 / 法式休閒系列
       '페일블루진': 'Pale Blue Jean',
       '프렌치캐주얼': 'French Casual',
       '프렌치모닝': 'French Morning',
@@ -105,12 +105,11 @@ window.REGISTERED_ENGINES.push({
       englishTitle = await translateKoToEn(cleanTitle);
     }
 
-    if (englishTitle.indexOf('Four Seasons') === -1 && englishTitle.indexOf('All Seasons') === -1) {
-      englishTitle = englishTitle.replace(/Four Seasons\/Fever\/Interseasonal/i, 'Four Seasons')
-                                 .replace(/Four Seasons\/Warm Heated\/In-between Seasons/i, 'Four Seasons')
-                                 .replace(/간절기\/사계절/i, 'Four Seasons')
-                                 .trim();
-    }
+    englishTitle = englishTitle.replace(/Four Seasons\/Fever\/Interseasonal/i, 'Four Seasons')
+                               .replace(/Four Seasons\/Warm Heated\/In-between Seasons/i, 'Four Seasons')
+                               .replace(/간절기\/사계절/i, 'Four Seasons')
+                               .trim();
+
     var cleanHandle = (englishTitle || 'maatila-product').toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/[\s_]+/g, '-');
 
     // 3. 基礎價格
@@ -118,7 +117,7 @@ window.REGISTERED_ENGINES.push({
     var priceMatch = html.match(/product_price\s*=\s*'(\d+)'/);
     if (priceMatch) price = priceMatch[1] + '.00';
 
-    // 4. 解析按鈕選項矩陣：【嚴格只保留 사계절 (Four Seasons)】
+    // 4. 解析按鈕選項矩陣：智慧適配「有季節」與「無季節」商品
     var variants = [];
     var optValuesMatches = html.matchAll(/opt_values:'([^']+)',sto_price:'([^']+)'/g);
     var seenVariants = {};
@@ -128,39 +127,49 @@ window.REGISTERED_ENGINES.push({
       var addPrice = parseFloat(m[2]) || 0;
       var finalPrice = (parseFloat(price) + addPrice).toFixed(2);
 
-      // rawVals: [0] 계절, [1] 색상, [2] 사이즈, [3] 구성
-      if (rawVals.length >= 3) {
-        var rawSeason = rawVals[0].trim();
-        var rawColor = rawVals[1].trim();
-        var rawSize = rawVals[2].trim();
-        var rawSet = rawVals[3] ? rawVals[3].trim() : '';
+      var rawColor = '';
+      var rawSize = '';
+      var rawSet = '';
 
-        // ★ 核心：非四季款直接剔除
-        if (rawSeason !== '사계절') {
+      // 情況 A：含有「季節」維度（例如：사계절, 아이보리, 슈퍼싱글SS, 차렵이불단품）
+      if (rawVals.length >= 4 && (rawVals[0].indexOf('사계절') !== -1 || rawVals[0].indexOf('간절기') !== -1 || rawVals[0].indexOf('발열') !== -1)) {
+        // 非四季款直接跳過
+        if (rawVals[0].trim() !== '사계절') {
           continue;
         }
+        rawColor = rawVals[1].trim();
+        rawSize = rawVals[2].trim();
+        rawSet = rawVals[3] ? rawVals[3].trim() : '';
+      }
+      // 情況 B：無「季節」維度（例如 Guard M2：페일블루진, 슈퍼싱글SS, 차렵이불단품）
+      else if (rawVals.length >= 2) {
+        rawColor = rawVals[0].trim();
+        rawSize = rawVals[1].trim();
+        rawSet = rawVals[2] ? rawVals[2].trim() : '';
+      }
 
-        // 雙軌顏色翻譯：先查字典，若為新色則即時 Google 翻譯
-        var color = COLOR_MAP[rawColor];
-        if (!color) {
-          color = await translateKoToEn(rawColor);
-          COLOR_MAP[rawColor] = color; // 記錄快取
-        }
+      if (!rawColor || !rawSize) continue;
 
-        var size = SIZE_MAP[rawSize] || rawSize;
-        if (rawSet && rawSet.indexOf('베개') !== -1) {
-          size += ' (Set)';
-        }
+      // 顏色翻譯（字典優先，若無則 Google 翻譯）
+      var color = COLOR_MAP[rawColor];
+      if (!color) {
+        color = await translateKoToEn(rawColor);
+        COLOR_MAP[rawColor] = color;
+      }
 
-        var key = color + '__' + size;
-        if (!seenVariants[key]) {
-          seenVariants[key] = true;
-          variants.push({
-            color: color,
-            size: size,
-            price: finalPrice
-          });
-        }
+      var size = SIZE_MAP[rawSize] || rawSize;
+      if (rawSet && rawSet.indexOf('베개') !== -1) {
+        size += ' (Set)';
+      }
+
+      var key = color + '__' + size;
+      if (!seenVariants[key]) {
+        seenVariants[key] = true;
+        variants.push({
+          color: color,
+          size: size,
+          price: finalPrice
+        });
       }
     }
 
@@ -179,10 +188,9 @@ window.REGISTERED_ENGINES.push({
 
       var low = src.toLowerCase();
 
-      // 黑名單過濾：封殺 /option/ 按鈕色塊、品牌 banner 及雜誌圖標
       var isJunk = low.indexOf('.svg') !== -1 ||
                    low.indexOf('.gif') !== -1 ||
-                   low.indexOf('/option/') !== -1 || // 剔除按鈕色塊小圖
+                   low.indexOf('/option/') !== -1 || // 剔除按鈕色塊
                    low.indexOf('icon') !== -1 ||
                    low.indexOf('btn') !== -1 ||
                    low.indexOf('logo') !== -1 ||
@@ -190,7 +198,6 @@ window.REGISTERED_ENGINES.push({
                    low.indexOf('naver') !== -1 ||
                    low.indexOf('top_brand') !== -1;
 
-      // 只保留真實商品輪播大圖與詳細內容圖片
       if (!isJunk && (low.indexOf('shopimages/maatila') !== -1 || low.indexOf('img18.kr') !== -1 || low.indexOf('thumbnail') !== -1 || low.indexOf('jpg3.kr') !== -1)) {
         if (!keyImage) keyImage = src;
         if (allImages.indexOf(src) === -1) {
